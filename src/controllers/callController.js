@@ -83,6 +83,7 @@ export const inboundCall = async (req, res) => {
         global.callContextMap.set(callSid, context); // Also store by Twilio SID
         global.callContextMap.set(contextKey, context);
 
+        console.log('called to stream.......')
         // Tell Twilio to stream audio to our backend with context key
         const twiml = new VoiceResponse();
         twiml.connect().stream({
@@ -294,6 +295,8 @@ export const handleCallStatus = async (req, res) => {
     try {
         const { CallSid, CallStatus } = req.body;
 
+        const normalizedStatus = mapTwilioStatus(CallStatus);
+
         const call = await Call.findOneAndUpdate(
             { callSid: CallSid },
             { $set: { status: CallStatus, updatedAt: new Date() } },
@@ -312,7 +315,7 @@ export const handleCallStatus = async (req, res) => {
             const reminderType = call.metadata.reminderType || 'manual';
             await Appointment.findByIdAndUpdate(call.metadata.appointmentId, {
                 $set: {
-                    [`reminderCalls.${reminderType}.status`]: CallStatus === "completed" ? "answered" : CallStatus,
+                    [`reminderCalls.${reminderType}.status`]: normalizedStatus,
                     [`reminderCalls.${reminderType}.callSid`]: CallSid,
                     [`reminderCalls.${reminderType}.updatedAt`]: new Date()
                 }
@@ -321,10 +324,9 @@ export const handleCallStatus = async (req, res) => {
 
         // Handle follow-up call status updates
         if (call?.metadata?.callType === "follow_up" && call.metadata.appointmentId) {
-            const status = this.mapCallStatusToFollowUpStatus(CallStatus);
             await Appointment.findByIdAndUpdate(call.metadata.appointmentId, {
                 $set: {
-                    'followUpCall.status': status,
+                    'followUpCall.status': normalizedStatus,
                     'followUpCall.callSid': CallSid,
                     'followUpCall.lastStatusUpdate': new Date()
                 }
@@ -341,19 +343,20 @@ export const handleCallStatus = async (req, res) => {
 /**
  * Map Twilio call status to our follow-up status
  */
-const mapCallStatusToFollowUpStatus = (twilioStatus) => {
+const mapTwilioStatus = (twilioStatus) => {
     switch (twilioStatus) {
         case 'completed':
             return 'answered';
         case 'busy':
             return 'busy';
         case 'no-answer':
+            return 'no-answer';
         case 'failed':
-            return 'no_answer';
+            return 'failed';
         case 'canceled':
             return 'canceled';
         default:
-            return 'in_progress';
+            return 'in-progress';
     }
 };
 
@@ -369,3 +372,4 @@ export const callLogs = async (req, res) => {
         res.status(500).json({ error: "Failed to fetch call logs" });
     }
 };
+;

@@ -1451,13 +1451,10 @@ import CallLog from "../models/CallLog.js";
 import mongoose from "mongoose";
 import Doctor from "../models/Doctor.js";
 import { bookAppointment, findPatientAppointments, cancelAppointmentByDetails, rescheduleAppointmentByDetails } from "./appointment.js";
-import { processPrescriptionRefill } from '../services/prescriptionRefill.js';
+import { processPrescriptionRefill } from './prescriptionRefill.js';
 import Appointment from "../models/Appointment.js";
 
 function getInstructions(callContext, patientData, appointmentData) {
-
-    console.log(callContext.hospital.name);
-    
     const hospitalName = callContext.hospital.name || 'City General Hospital';
     const hospitalPhone = callContext.hospital.phonenumber || 'our main number';
     const hospitalAddress = callContext.hospital.hospitalAddress || 'our hospital';
@@ -1534,9 +1531,9 @@ function getInstructions(callContext, patientData, appointmentData) {
         // Outbound call specific behavior
         switch (callContext.callType) {
             case 'appointment_reminder':
-                roleAndGreeting = `You are making an OUTBOUND appointment reminder call for ${hospitalName}. The patient should be expecting this call or may not be. Be professional and clear about why you're calling.
+                roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} for an OUTBOUND appointment reminder. The patient should be expecting this call or may not be. Be professional and clear about why you're calling.
 
-                GREETING: "Hello, I am calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}? I'm calling to remind you about your upcoming appointment."`;
+                GREETING: "Hello, This is the Virtual assistant from ${hospitalName} calling. May I speak with ${patientData?.name || 'the patient'}? I'm calling to remind you about your upcoming appointment."`;
 
                 // ENHANCED: Add timing-specific messaging
                 const timingMessage = callContext.reminderType === '24_hour' ?
@@ -1561,9 +1558,9 @@ function getInstructions(callContext, patientData, appointmentData) {
                 break;
 
             case 'follow_up':
-                roleAndGreeting = `You are making an OUTBOUND follow-up call for ${hospitalName}. This is a check-in call to see how the patient is doing AFTER their recent appointment.
+                roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} for an OUTBOUND follow-up call. This is a check-in call to see how the patient is doing AFTER their recent appointment.
 
-                GREETING: "Hello, I am calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}? I'm calling to follow up on your recent visit with us."`;
+                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}? I'm calling to follow up on your recent visit with us."`;
 
                 specificInstructions = `
                 FOLLOW-UP SPECIFIC INSTRUCTIONS:
@@ -1580,9 +1577,9 @@ function getInstructions(callContext, patientData, appointmentData) {
                 break;
 
             case 'prescription_reminder':
-                roleAndGreeting = `You are making an OUTBOUND call for ${hospitalName} regarding prescription refills.
+                roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} regarding prescription refills.
 
-                GREETING: "Hello, I am calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}? I'm calling about your prescription refill."`;
+                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}? I'm calling about your prescription refill."`;
 
                 specificInstructions = `
                 PRESCRIPTION REMINDER INSTRUCTIONS:
@@ -1594,9 +1591,9 @@ function getInstructions(callContext, patientData, appointmentData) {
                 break;
 
             default:
-                roleAndGreeting = `You are making an OUTBOUND call for ${hospitalName}. Be professional and clearly state why you're calling.
+                roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName}. Be professional and clearly state why you're calling.
 
-                GREETING: "Hello,I am calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}?"`;
+                GREETING: "Hello,I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}?"`;
 
                 specificInstructions = `
                 GENERAL OUTBOUND INSTRUCTIONS:
@@ -1619,11 +1616,11 @@ function getInstructions(callContext, patientData, appointmentData) {
 
     } else {
         // Inbound call behavior (existing)
-        roleAndGreeting = `You are the AI receptionist for ${hospitalName}. Your role is to help patients with appointments, prescription refills, and general inquiries.
+        roleAndGreeting = `You are the Virtual receptionist for ${hospitalName}. Your role is to help patients with appointments, prescription refills, and general inquiries.
 
         GREETING:
-        - For new patients: "Thank you for calling ${hospitalName}. How can I help you today?"
-        - For returning patients: "Hello ${patientData?.name || 'there'}! How are you doing? What can I help you with today?"`;
+        - For new patients: "This is Virtual assistant,Thank you for calling ${hospitalName}. How can I help you today?"
+        - For returning patients: "Hello ${patientData?.name || 'there'}!, I am Virtual assistant, How are you doing? What can I help you with today?"`;
 
         specificInstructions = `
         INBOUND CALL INSTRUCTIONS:
@@ -1667,7 +1664,6 @@ function getInstructions(callContext, patientData, appointmentData) {
         - ONLY end the call when the patient CLEARLY indicates they want to end the conversation
         - Do NOT end the call just because patient says "thank you" - this could be in the middle of conversation
         - Look for CLEAR ending phrases like:
-        * "That's all I needed" + "thank you" 
         * "Nothing else" + any closing phrase
         * "I'm good" + "goodbye/bye"
         * "Have a good day" (from patient to you)
@@ -1969,7 +1965,7 @@ export async function callAssistant(connection, req) {
                         },
                         output: {
                             format: { type: 'audio/pcmu' },
-                            voice: 'coral',
+                            voice: 'cedar',
                             "speed": 1.0
                         },
                     },

@@ -1,5 +1,5 @@
 import { WebSocketServer } from "ws";
-import { callAssistant } from "../services/assistant.js";
+import { callAssistant } from "../services/callAssistant.js";
 
 export default function setupStream(server) {
     const wss = new WebSocketServer({ noServer: true });

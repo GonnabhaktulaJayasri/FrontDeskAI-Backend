@@ -136,7 +136,7 @@ class CallService {
                 to: phoneNumber,
                 url: `${process.env.BASE_URL}/api/calls/outbound-twiml?contextKey=${contextKey}`,
                 statusCallback: `${process.env.BASE_URL}/api/calls/status`,
-                statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+                statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed','no_answer'],
                 statusCallbackMethod: 'POST'
             });
 

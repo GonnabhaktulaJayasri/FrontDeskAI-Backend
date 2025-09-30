@@ -5,7 +5,20 @@ const callSchema = new mongoose.Schema({
 
   // Basic call info
   type: { type: String, enum: ["inbound", "outbound"], required: true },
-  status: { type: String, enum: ["initiated", "completed", "missed"], default: "" },
+  status: {
+    type: String, enum: [
+      "initiated",
+      "ringing",
+      "in-progress",
+      "completed",
+      "busy",
+      "failed",
+      "no-answer",
+      "canceled",
+      "missed"  // custom if you need
+    ],
+    default: "initiated"
+  },
   duration: Number, // in seconds
 
   // Optional but useful for analytics

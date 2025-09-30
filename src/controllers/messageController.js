@@ -1,109 +1,91 @@
-// Create controllers/messageController.js
-
 import messageService from "../services/messageService.js";
-import Patient from "../models/Patient.js";
-import Appointment from "../models/Appointment.js";
-
+import Message from "../models/Message.js";
 /**
- * Handle incoming SMS messages from Twilio
+ * Handle Twilio Conversations API messages (unified messaging)
  */
-export const handleIncomingSMS = async (req, res) => {
+export const handleIncomingMessage = async (req, res) => {
     try {
-        console.log('Incoming SMS webhook:', req.body);
+        const { 
+            EventType, 
+            Author, 
+            Body, 
+            MessageSid, 
+            ConversationSid,
+            Source,
+            MessagingServiceSid,
+            ParticipantSid
+        } = req.body;
 
-        // Process the incoming message
-        const result = await messageService.processIncomingMessage(req);
+        console.log('🗨️ Twilio Conversation webhook:', {
+            eventType: EventType,
+            author: Author,
+            conversationSid: ConversationSid,
+            source: Source
+        });
 
-        // Send 200 response to acknowledge webhook
-        res.status(200).send();
-
-        if (result.success) {
-            console.log('SMS processed successfully:', result);
-        } else {
-            console.log('SMS processing result:', result);
+        // Only process messages added to conversations
+        if (EventType !== 'onMessageAdded') {
+            console.log(`ℹ️ Ignoring conversation event: ${EventType}`);
+            return res.status(200).send();
         }
 
-    } catch (error) {
-        console.error('Error handling incoming SMS:', error);
-        res.status(500).send('Error processing SMS');
-    }
-};
-
-/**
- * Handle incoming WhatsApp messages from Twilio
- */
-export const handleIncomingWhatsApp = async (req, res) => {
-    try {
-        console.log('Incoming WhatsApp webhook:', req.body);
-
-        // Process the incoming message (same logic as SMS)
-        const result = await messageService.processIncomingMessage(req);
-
-        // Send 200 response to acknowledge webhook
-        res.status(200).send();
-
-        if (result.success) {
-            console.log('WhatsApp message processed successfully:', result);
-        } else {
-            console.log('WhatsApp processing result:', result);
+        // Skip messages sent by our service (check if Author is our Twilio phone number)
+        if (Author === process.env.TWILIO_PHONE_NUMBER || 
+            Author === process.env.TWILIO_WHATSAPP_NUMBER ||
+            Author?.startsWith('whatsapp:' + process.env.TWILIO_PHONE_NUMBER?.replace('+', ''))) {
+            console.log('⏭️ Skipping outbound message from our service');
+            return res.status(200).send();
         }
 
-    } catch (error) {
-        console.error('Error handling incoming WhatsApp:', error);
-        res.status(500).send('Error processing WhatsApp message');
-    }
-};
+        // Skip if no message body (system messages, delivery receipts, etc.)
+        if (!Body || Body.trim().length === 0) {
+            console.log('⏭️ Skipping message without body');
+            return res.status(200).send();
+        }
 
-/**
- * Handle message delivery status updates from Twilio
- */
-export const handleMessageStatus = async (req, res) => {
-    try {
-        const { MessageSid, MessageStatus, From, To } = req.body;
+        // Determine if this is WhatsApp based on Source or Author format
+        const isWhatsApp = Source === 'WhatsApp' || Author?.startsWith('whatsapp:');
+        const cleanAuthor = Author?.replace('whatsapp:', '') || Author;
 
-        console.log(`Message ${MessageSid} status: ${MessageStatus}`);
-
-        // Find and update the message interaction
-        const cleanFrom = From ? From.replace('whatsapp:', '') : null;
-        const cleanTo = To ? To.replace('whatsapp:', '') : null;
-
-        // Determine which phone number is the patient's
-        const patientPhone = cleanFrom === process.env.TWILIO_PHONE ? cleanTo : cleanFrom;
-
-        if (patientPhone) {
-            const updateResult = await Patient.findOneAndUpdate(
-                {
-                    phone: patientPhone,
-                    'messageInteractions.messageSid': MessageSid
-                },
-                {
-                    $set: {
-                        'messageInteractions.$.deliveredAt': MessageStatus === 'delivered' ? new Date() : undefined,
-                        'messageInteractions.$.readAt': MessageStatus === 'read' ? new Date() : undefined,
-                        'messageInteractions.$.status': MessageStatus
-                    }
-                }
-            );
-
-            if (updateResult) {
-                console.log(`Updated message interaction for patient ${patientPhone}`);
+        // Create a compatible request object for our AI service
+        const fakeReq = {
+            body: {
+                From: Author, // Keep original format for WhatsApp detection
+                To: process.env.TWILIO_PHONE_NUMBER, // Use our service number as destination
+                Body: Body,
+                MessageSid: MessageSid,
+                ConversationSid: ConversationSid,
+                SmsStatus: 'received'
             }
-        }
+        };
+
+        // Process with enhanced AI service
+        const result = await messageService.processIncomingMessage(fakeReq);
 
         res.status(200).send();
 
+        if (result.success) {
+            console.log('✅ Conversation message processed successfully:', {
+                action: result.action,
+                responseTime: result.responseTime + 'ms',
+                needsEscalation: result.needsEscalation
+            });
+        } else {
+            console.log('❌ Conversation processing failed:', result.error);
+        }
+
     } catch (error) {
-        console.error('Error handling message status:', error);
-        res.status(500).send('Error processing message status');
+        console.error('🚨 Error handling Twilio conversation:', error);
+        res.status(200).send();
     }
 };
 
 /**
- * Send manual reminder message
+ * Start AI-powered appointment reminder conversation
  */
-export const sendManualReminder = async (req, res) => {
+export const startAppointmentReminderMessage = async (req, res) => {
     try {
-        const { appointmentId, method = 'sms', reminderType = '24h' } = req.body;
+        const { appointmentId, method = 'sms', reminderType = 'appointment_reminder' } = req.body;
 
         if (!appointmentId) {
             return res.status(400).json({
@@ -112,30 +94,49 @@ export const sendManualReminder = async (req, res) => {
             });
         }
 
-        const result = await messageService.sendAppointmentReminder(
+        console.log(`📅 Starting appointment reminder: ${appointmentId} via ${method}`);
+
+        const result = await messageService.startMessageConversation(
             appointmentId,
             reminderType,
             method
         );
 
-        res.json(result);
+        if (result.success) {
+            console.log('✅ AI appointment reminder started:', result.conversationId);
+            res.json({
+                success: true,
+                message: 'AI appointment reminder started successfully',
+                conversationId: result.conversationId,
+                messageSid: result.messageSid,
+                method: method,
+                note: 'Patient will receive AI-powered reminder and can respond for full assistance'
+            });
+        } else {
+            console.log('❌ Failed to start appointment reminder:', result.error);
+            res.status(400).json({
+                success: false,
+                error: 'Failed to start appointment reminder',
+                reason: result.reason || result.error
+            });
+        }
 
     } catch (error) {
-        console.error('Error sending manual reminder:', error);
+        console.error('🚨 Error starting appointment reminder:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to send reminder message',
+            error: 'Failed to start appointment reminder conversation',
             details: error.message
         });
     }
 };
 
 /**
- * Send manual follow-up message
+ * Start AI-powered follow-up conversation
  */
-export const sendManualFollowUp = async (req, res) => {
+export const startFollowUpMessage = async (req, res) => {
     try {
-        const { appointmentId, method = 'sms', followUpType = 'post_appointment' } = req.body;
+        const { appointmentId, method = 'sms', followUpType = 'follow_up' } = req.body;
 
         if (!appointmentId) {
             return res.status(400).json({
@@ -144,310 +145,219 @@ export const sendManualFollowUp = async (req, res) => {
             });
         }
 
-        const result = await messageService.sendFollowUpMessage(
+        console.log(`🔄 Starting follow-up message: ${appointmentId} via ${method}`);
+
+        const result = await messageService.startMessageConversation(
             appointmentId,
             followUpType,
             method
         );
 
-        res.json(result);
+        if (result.success) {
+            console.log('✅ AI follow-up started:', result.conversationId);
+            res.json({
+                success: true,
+                message: 'AI follow-up conversation started successfully',
+                conversationId: result.conversationId,
+                messageSid: result.messageSid,
+                method: method,
+                note: 'Patient will receive AI-powered follow-up and can respond for assistance'
+            });
+        } else {
+            console.log('❌ Failed to start follow-up:', result.error);
+            res.status(400).json({
+                success: false,
+                error: 'Failed to start follow-up conversation',
+                reason: result.reason || result.error
+            });
+        }
 
     } catch (error) {
-        console.error('Error sending manual follow-up:', error);
+        console.error('🚨 Error starting follow-up conversation:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to send follow-up message',
+            error: 'Failed to start follow-up conversation',
             details: error.message
         });
     }
 };
 
 /**
- * Update patient communication preferences
+ * Get conversation history for a patient
  */
-export const updateCommunicationPreferences = async (req, res) => {
+export const getConversationHistory = async (req, res) => {
     try {
         const { patientId } = req.params;
-        const preferences = req.body;
+        const { limit = 50, method } = req.query;
 
-        const updatedPatient = await Patient.findByIdAndUpdate(
-            patientId,
-            { $set: { communicationPreferences: preferences } },
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedPatient) {
-            return res.status(404).json({
-                success: false,
-                error: 'Patient not found'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Communication preferences updated',
-            preferences: updatedPatient.communicationPreferences
-        });
-
-    } catch (error) {
-        console.error('Error updating communication preferences:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update preferences',
-            details: error.message
-        });
-    }
-};
-
-/**
- * Opt patient into WhatsApp
- */
-export const optInWhatsApp = async (req, res) => {
-    try {
-        const { phone } = req.body;
-        const { source = 'manual' } = req.body;
-
-        if (!phone) {
+        if (!patientId) {
             return res.status(400).json({
                 success: false,
-                error: 'Phone number is required'
+                error: 'Patient ID is required'
             });
         }
 
-        const updatedPatient = await Patient.findOneAndUpdate(
-            { phone: phone },
-            {
-                $set: {
-                    'whatsappOptIn.status': true,
-                    'whatsappOptIn.optInDate': new Date(),
-                    'whatsappOptIn.source': source,
-                    'communicationPreferences.allowWhatsApp': true
-                }
-            },
-            { new: true, upsert: true }
-        );
+        const query = { patient: patientId };
+        if (method) {
+            query.method = method; // Filter by sms or whatsapp
+        }
+
+        const conversations = await Message.find(query)
+            .populate('patient', 'name phone')
+            .populate('hospital', 'name')
+            .populate('appointment', 'dateTime doctor')
+            .sort({ lastActivity: -1 })
+            .limit(parseInt(limit));
 
         res.json({
             success: true,
-            message: 'Patient opted into WhatsApp successfully',
-            patient: {
-                id: updatedPatient._id,
-                phone: updatedPatient.phone,
-                whatsappOptIn: updatedPatient.whatsappOptIn
-            }
+            conversations: conversations,
+            total: conversations.length
         });
 
     } catch (error) {
-        console.error('Error opting into WhatsApp:', error);
+        console.error('Error fetching conversation history:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to opt into WhatsApp',
+            error: 'Failed to fetch conversation history',
             details: error.message
         });
     }
 };
 
 /**
- * Opt patient out of WhatsApp
+ * Get AI service performance statistics
  */
-export const optOutWhatsApp = async (req, res) => {
+export const getPerformanceStats = async (req, res) => {
     try {
-        const { phone } = req.body;
+        const stats = messageService.getPerformanceStats();
+        
+        res.json({
+            success: true,
+            performance: stats,
+            timestamp: new Date(),
+            note: 'AI Message Service Performance Metrics'
+        });
 
-        if (!phone) {
+    } catch (error) {
+        console.error('Error fetching performance stats:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch performance statistics',
+            details: error.message
+        });
+    }
+};
+
+/**
+ * Manually escalate a conversation to human agent
+ */
+export const escalateConversation = async (req, res) => {
+    try {
+        const { conversationId, reason, priority = 'medium' } = req.body;
+
+        if (!conversationId) {
             return res.status(400).json({
                 success: false,
-                error: 'Phone number is required'
+                error: 'Conversation ID is required'
             });
         }
 
-        const updatedPatient = await Patient.findOneAndUpdate(
-            { phone: phone },
-            {
-                $set: {
-                    'whatsappOptIn.status': false,
-                    'whatsappOptIn.optOutDate': new Date(),
-                    'communicationPreferences.allowWhatsApp': false
-                }
-            },
-            { new: true }
+        const conversation = await Message.findById(conversationId)
+            .populate('patient')
+            .populate('hospital');
+
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                error: 'Conversation not found'
+            });
+        }
+
+        // Handle escalation
+        await messageService.handleEscalation(
+            conversation.patient,
+            conversation.hospital,
+            'manual_escalation',
+            reason || 'Manual escalation requested'
         );
 
-        if (!updatedPatient) {
-            return res.status(404).json({
-                success: false,
-                error: 'Patient not found'
-            });
-        }
+        // Update conversation status
+        await Message.findByIdAndUpdate(conversationId, {
+            status: 'escalated',
+            escalatedAt: new Date(),
+            escalationReason: reason
+        });
+
+        console.log(`🚨 Manual escalation: ${conversationId}`);
 
         res.json({
             success: true,
-            message: 'Patient opted out of WhatsApp',
-            patient: {
-                id: updatedPatient._id,
-                phone: updatedPatient.phone,
-                whatsappOptIn: updatedPatient.whatsappOptIn
-            }
+            message: 'Conversation escalated to human agent successfully',
+            conversationId: conversationId,
+            patient: conversation.patient.name,
+            phone: conversation.patient.phone,
+            escalatedAt: new Date()
         });
 
     } catch (error) {
-        console.error('Error opting out of WhatsApp:', error);
+        console.error('Error escalating conversation:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to opt out of WhatsApp',
+            error: 'Failed to escalate conversation',
             details: error.message
         });
     }
 };
 
 /**
- * Get patient message history
+ * Send manual message (admin override)
  */
-export const getMessageHistory = async (req, res) => {
+export const sendManualMessage = async (req, res) => {
     try {
-        const { patientId } = req.params;
-        const { limit = 20, page = 1, type } = req.query;
+        const { patientPhone, message, method = 'sms' } = req.body;
 
-        const patient = await Patient.findById(patientId);
-        if (!patient) {
-            return res.status(404).json({
+        if (!patientPhone || !message) {
+            return res.status(400).json({
                 success: false,
-                error: 'Patient not found'
+                error: 'Patient phone and message are required'
             });
         }
 
-        let messageInteractions = patient.messageInteractions;
+        const result = await messageService.sendMessage(patientPhone, message, method);
 
-        // Filter by type if specified
-        if (type) {
-            messageInteractions = messageInteractions.filter(interaction =>
-                interaction.type === type
-            );
+        if (result.success) {
+            console.log(`📤 Manual message sent via ${method.toUpperCase()}: ${result.messageSid}`);
+            res.json({
+                success: true,
+                message: 'Manual message sent successfully',
+                messageSid: result.messageSid,
+                method: method,
+                sentAt: new Date()
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                error: 'Failed to send manual message',
+                details: result.error
+            });
         }
 
-        // Sort by most recent first
-        messageInteractions.sort((a, b) => b.sentAt - a.sentAt);
-
-        // Pagination
-        const startIndex = (page - 1) * limit;
-        const paginatedMessages = messageInteractions.slice(startIndex, startIndex + limit);
-
-        res.json({
-            success: true,
-            messages: paginatedMessages,
-            pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
-                total: messageInteractions.length,
-                totalPages: Math.ceil(messageInteractions.length / limit)
-            }
-        });
-
     } catch (error) {
-        console.error('Error getting message history:', error);
+        console.error('Error sending manual message:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to get message history',
+            error: 'Failed to send manual message',
             details: error.message
         });
     }
 };
 
-/**
- * Get messaging statistics
- */
-export const getMessagingStats = async (req, res) => {
-    try {
-        const { days = 30 } = req.query;
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - parseInt(days));
-
-        const stats = await Patient.aggregate([
-            {
-                $match: {
-                    'messageInteractions.sentAt': { $gte: startDate }
-                }
-            },
-            {
-                $unwind: '$messageInteractions'
-            },
-            {
-                $match: {
-                    'messageInteractions.sentAt': { $gte: startDate }
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        type: '$messageInteractions.type',
-                        method: '$messageInteractions.method'
-                    },
-                    count: { $sum: 1 },
-                    responded: {
-                        $sum: {
-                            $cond: [{ $ne: ['$messageInteractions.respondedAt', null] }, 1, 0]
-                        }
-                    },
-                    escalatedToCalls: {
-                        $sum: {
-                            $cond: [{ $eq: ['$messageInteractions.escalatedToCall', true] }, 1, 0]
-                        }
-                    }
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    byType: {
-                        $push: {
-                            type: '$_id.type',
-                            method: '$_id.method',
-                            sent: '$count',
-                            responded: '$responded',
-                            responseRate: {
-                                $multiply: [{ $divide: ['$responded', '$count'] }, 100]
-                            },
-                            escalatedToCalls: '$escalatedToCalls'
-                        }
-                    },
-                    totalSent: { $sum: '$count' },
-                    totalResponded: { $sum: '$responded' },
-                    totalEscalated: { $sum: '$escalatedToCalls' }
-                }
-            }
-        ]);
-
-        const result = stats[0] || {
-            byType: [],
-            totalSent: 0,
-            totalResponded: 0,
-            totalEscalated: 0
-        };
-
-        result.overallResponseRate = result.totalSent > 0
-            ? Math.round((result.totalResponded / result.totalSent) * 100)
-            : 0;
-
-        result.escalationRate = result.totalSent > 0
-            ? Math.round((result.totalEscalated / result.totalSent) * 100)
-            : 0;
-
-        res.json({
-            success: true,
-            stats: result,
-            dateRange: {
-                days: parseInt(days),
-                from: startDate.toISOString(),
-                to: new Date().toISOString()
-            }
-        });
-
-    } catch (error) {
-        console.error('Error getting messaging stats:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to get messaging statistics',
-            details: error.message
-        });
-    }
+export default {
+    handleIncomingMessage,
+    startAppointmentReminderMessage,
+    startFollowUpMessage,
+    getConversationHistory,
+    getPerformanceStats,
+    escalateConversation,
 };

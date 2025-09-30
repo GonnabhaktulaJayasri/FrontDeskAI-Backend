@@ -10,6 +10,7 @@ import patientRoutes from "./routes/patients.js";
 import doctorRoutes from "./routes/doctors.js";
 import callLogRoutes from "./routes/callLogs.js";
 import appointmentRoutes from "./routes/appointments.js"
+import messageRoutes from "./routes/messages.js"
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.json()); // parse application/json
 app.use(express.urlencoded({ extended: true }));
+// app.use('/api/messages/webhook', bodyParser.urlencoded({ extended: false }));
 
 // DB connection
 connectDB();
@@ -31,6 +33,7 @@ app.use("/api/patients", patientRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/call-logs", callLogRoutes);
+app.use("/api/messages", messageRoutes);
 
 app.get("/", (req, res) => {
     res.send("API is running...");

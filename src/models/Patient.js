@@ -50,7 +50,7 @@ const patientSchema = new mongoose.Schema({
         preferredMethod: {
             type: String,
             enum: ['call', 'sms', 'whatsapp', 'both_messages'],
-            default: 'call'
+            default: 'sms'
         },
         allowSMS: { type: Boolean, default: true },
         allowWhatsApp: { type: Boolean, default: false },
