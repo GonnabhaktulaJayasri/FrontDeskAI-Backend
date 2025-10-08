@@ -11,8 +11,21 @@ const hospitalSchema = new mongoose.Schema({
     hospitalWebsite: { type: String },
     weekdayHours: { type: String },
     weekendHours: { type: String },
+    twilioPhoneNumber: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
+    twilioPhoneSid: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
     createdAt: { type: Date, default: Date.now },
     logoutAt: { type: Date, default: null }
 });
+
+hospitalSchema.index({ twilioPhoneNumber: 1 }, { unique: true, sparse: true });
+hospitalSchema.index({ twilioPhoneSid: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model("Hospital", hospitalSchema);

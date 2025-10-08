@@ -33,9 +33,12 @@ import mongoose from "mongoose";
 
 const patientSchema = new mongoose.Schema({
     phone: { type: String, required: true, unique: true },
-    name: { type: String },
-    age: { type: Number },
-    gender: { type: String, enum: ["male", "female", "other"] },
+    firstName: { type: String, required: true, },
+    lastName: { type: String, required: true, },
+    email: { type: String, required: true, },
+    age: { type: Number, required: true, },
+    dob: { type: Date, required: true, },
+    gender: { type: String, enum: ["male", "female", "other"], required: true, },
 
     // Last confirmed appointment
     lastAppointment: { type: Date },
@@ -57,7 +60,7 @@ const patientSchema = new mongoose.Schema({
         allowCalls: { type: Boolean, default: true },
         language: { type: String, default: 'en' },
         timezone: { type: String, default: 'America/New_York' },
-        
+
         // Message interaction preferences
         autoEscalateToCall: { type: Boolean, default: false }, // If they prefer messages but allow call escalation
         responseTimeoutHours: { type: Number, default: 4 }, // Hours to wait before escalating
@@ -70,13 +73,13 @@ const patientSchema = new mongoose.Schema({
 
     // Message interaction history
     messageInteractions: [{
-        type: { 
-            type: String, 
-            enum: ['appointment_reminder', 'follow_up', 'general', 'escalation_request'] 
+        type: {
+            type: String,
+            enum: ['appointment_reminder', 'follow_up', 'general', 'escalation_request']
         },
-        method: { 
-            type: String, 
-            enum: ['sms', 'whatsapp'] 
+        method: {
+            type: String,
+            enum: ['sms', 'whatsapp']
         },
         messageSid: String,
         sentAt: { type: Date, default: Date.now },
@@ -87,14 +90,14 @@ const patientSchema = new mongoose.Schema({
         escalatedToCall: { type: Boolean, default: false },
         callSid: String, // If escalated to call
         appointmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Appointment' },
-        
+
         // Message content tracking
         templateUsed: String,
         messageContent: String,
         responseContent: String,
-        sentiment: { 
-            type: String, 
-            enum: ['positive', 'neutral', 'negative', 'confused'] 
+        sentiment: {
+            type: String,
+            enum: ['positive', 'neutral', 'negative', 'confused']
         }
     }],
 
@@ -120,15 +123,15 @@ const patientSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Methods for communication preference management
-patientSchema.methods.getPreferredContactMethod = function() {
+patientSchema.methods.getPreferredContactMethod = function () {
     const prefs = this.communicationPreferences;
-    
+
     // Check quiet hours
     if (prefs.quietHours.enabled) {
         const now = new Date();
         const currentTime = now.toTimeString().slice(0, 5);
         const { startTime, endTime } = prefs.quietHours;
-        
+
         if (currentTime >= startTime || currentTime <= endTime) {
             // During quiet hours, prefer messages over calls
             if (prefs.allowSMS || prefs.allowWhatsApp) {
@@ -136,27 +139,27 @@ patientSchema.methods.getPreferredContactMethod = function() {
             }
         }
     }
-    
+
     return prefs.preferredMethod;
 };
 
-patientSchema.methods.canReceiveMessages = function(type = 'sms') {
+patientSchema.methods.canReceiveMessages = function (type = 'sms') {
     if (type === 'whatsapp') {
-        return this.communicationPreferences.allowWhatsApp && 
-               this.whatsappOptIn.status;
+        return this.communicationPreferences.allowWhatsApp &&
+            this.whatsappOptIn.status;
     }
     return this.communicationPreferences.allowSMS;
 };
 
-patientSchema.methods.shouldEscalateToCall = function(messageType, hoursSinceMessage = 0) {
+patientSchema.methods.shouldEscalateToCall = function (messageType, hoursSinceMessage = 0) {
     const prefs = this.communicationPreferences;
-    
+
     // If they don't allow calls, never escalate
     if (!prefs.allowCalls) return false;
-    
+
     // If auto-escalation is disabled, only escalate on explicit request
     if (!prefs.autoEscalateToCall) return false;
-    
+
     // Check if enough time has passed
     return hoursSinceMessage >= prefs.responseTimeoutHours;
 };

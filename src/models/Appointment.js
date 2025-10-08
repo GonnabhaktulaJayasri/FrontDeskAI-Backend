@@ -213,9 +213,10 @@ const appointmentSchema = new mongoose.Schema({
   dateTime: { type: Date, required: true },
   status: {
     type: String,
-    enum: ['initiated', 'scheduled', 'confirmed', 'rescheduled', 'cancelled'],
-    default: 'initiated'
+    enum: ['initiated', 'scheduled', 'confirmed', 'rescheduled', 'cancelled', 'completed'],
+    default: 'scheduled'
   },
+  completedAt: { type: Date },
   reason: String,
 
   // UPDATED: Unified reminder system for both calls and messages
@@ -239,9 +240,9 @@ const appointmentSchema = new mongoose.Schema({
       sentAt: { type: Date },
       callSid: { type: String }, // For calls
       messageSid: { type: String }, // For messages
-      conversationId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'MessageConversation' 
+      conversationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MessageConversation'
       }, // Link to message conversation
       attemptCount: { type: Number, default: 0 },
       maxAttempts: { type: Number, default: 3 },
@@ -267,9 +268,9 @@ const appointmentSchema = new mongoose.Schema({
       sentAt: { type: Date },
       callSid: { type: String },
       messageSid: { type: String },
-      conversationId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'MessageConversation' 
+      conversationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MessageConversation'
       },
       attemptCount: { type: Number, default: 0 },
       maxAttempts: { type: Number, default: 3 },
@@ -373,31 +374,31 @@ const appointmentSchema = new mongoose.Schema({
     maxAttempts: { type: Number, default: 3 },
     lastAttempt: { type: Date },
     sentAt: { type: Date },
-    
+
     // Communication tracking
     callSid: { type: String },
     messageSid: { type: String },
-    conversationId: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'MessageConversation' 
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MessageConversation'
     },
     callRecordId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Call'
     },
-    
+
     // Escalation tracking
     escalatedAt: { type: Date },
     escalationReason: {
       type: String,
       enum: ['no_response', 'patient_request', 'complex_issue', 'manual']
     },
-    
+
     lastStatusUpdate: { type: Date },
     errorMessage: { type: String },
     notes: { type: String },
     toggledAt: { type: Date },
-    
+
     // Follow-up results
     outcome: {
       type: String,
@@ -414,7 +415,7 @@ const appointmentSchema = new mongoose.Schema({
     status: {
       type: String,
       enum: [
-        'not_scheduled', 'scheduled', 'in_progress', 'sent', 'answered', 
+        'not_scheduled', 'scheduled', 'in_progress', 'sent', 'answered',
         'no_answer', 'busy', 'failed', 'canceled', 'sent_message'
       ],
       default: 'not_scheduled'
@@ -462,6 +463,7 @@ appointmentSchema.index({ patient: 1, dateTime: -1 });
 appointmentSchema.index({ doctor: 1, dateTime: 1 });
 appointmentSchema.index({ dateTime: 1 });
 appointmentSchema.index({ status: 1 });
+appointmentSchema.index({ completedAt: 1 });
 
 // Unified reminder indexes
 appointmentSchema.index({ 'reminders.24_hour.status': 1, 'reminders.24_hour.method': 1 });
@@ -481,6 +483,10 @@ appointmentSchema.index({ 'communicationSummary.patientResponsiveness': 1 });
 
 // Pre-save middleware
 appointmentSchema.pre('save', function (next) {
+  if (this.status === 'completed' && !this.completedAt) {
+    this.completedAt = new Date();
+  }
+
   // Initialize unified structures if they don't exist
   if (!this.reminders) {
     this.reminders = {
@@ -528,34 +534,40 @@ appointmentSchema.pre('save', function (next) {
   next();
 });
 
+appointmentSchema.methods.markCompleted = function () {
+  this.status = 'completed';
+  this.completedAt = new Date();
+  return this.save();
+};
+
 // UPDATED: Enhanced instance methods
-appointmentSchema.methods.updateCommunicationSummary = function() {
+appointmentSchema.methods.updateCommunicationSummary = function () {
   const summary = this.communicationSummary;
-  
+
   // Count reminders
   summary.totalReminders = 0;
   if (this.reminders['24_hour'].status !== 'not_sent') summary.totalReminders++;
   if (this.reminders['1_hour'].status !== 'not_sent') summary.totalReminders++;
-  
+
   // Count follow-ups
   summary.totalFollowUps = this.followUp.status !== 'not_scheduled' ? 1 : 0;
-  
+
   // Count by method
   summary.callsAttempted = this.countAttemptsByMethod('call');
   summary.messagesAttempted = this.countAttemptsByMethod(['sms', 'whatsapp']);
-  
+
   // Count successful contacts
   summary.successfulContacts = this.countSuccessfulContacts();
-  
+
   // Determine responsiveness
   summary.patientResponsiveness = this.calculateResponsiveness();
 };
 
-appointmentSchema.methods.countAttemptsByMethod = function(methods) {
+appointmentSchema.methods.countAttemptsByMethod = function (methods) {
   if (typeof methods === 'string') methods = [methods];
-  
+
   let count = 0;
-  
+
   // Check reminders
   if (methods.includes(this.reminders['24_hour'].method)) {
     count += this.reminders['24_hour'].attemptCount || 0;
@@ -563,18 +575,18 @@ appointmentSchema.methods.countAttemptsByMethod = function(methods) {
   if (methods.includes(this.reminders['1_hour'].method)) {
     count += this.reminders['1_hour'].attemptCount || 0;
   }
-  
+
   // Check follow-up
   if (methods.includes(this.followUp.method)) {
     count += this.followUp.attemptCount || 0;
   }
-  
+
   return count;
 };
 
-appointmentSchema.methods.countSuccessfulContacts = function() {
+appointmentSchema.methods.countSuccessfulContacts = function () {
   let count = 0;
-  
+
   // Check reminder responses
   if (this.reminders['24_hour'].response && this.reminders['24_hour'].response !== 'no_response') {
     count++;
@@ -582,41 +594,41 @@ appointmentSchema.methods.countSuccessfulContacts = function() {
   if (this.reminders['1_hour'].response && this.reminders['1_hour'].response !== 'no_response') {
     count++;
   }
-  
+
   // Check follow-up success
   const successStatuses = ['answered', 'completed', 'delivered', 'read'];
   if (successStatuses.includes(this.followUp.status)) {
     count++;
   }
-  
+
   return count;
 };
 
-appointmentSchema.methods.calculateResponsiveness = function() {
+appointmentSchema.methods.calculateResponsiveness = function () {
   const total = this.communicationSummary.totalReminders + this.communicationSummary.totalFollowUps;
   const successful = this.communicationSummary.successfulContacts;
-  
+
   if (total === 0) return 'unknown';
-  
+
   const rate = successful / total;
   if (rate >= 0.8) return 'high';
   if (rate >= 0.5) return 'medium';
   return 'low';
 };
 
-appointmentSchema.methods.setReminderMethod = function(reminderType, method) {
+appointmentSchema.methods.setReminderMethod = function (reminderType, method) {
   if (!this.reminders[reminderType]) return false;
-  
+
   this.reminders[reminderType].method = method;
   return this.save();
 };
 
-appointmentSchema.methods.setFollowUpMethod = function(method) {
+appointmentSchema.methods.setFollowUpMethod = function (method) {
   this.followUp.method = method;
   return this.save();
 };
 
-appointmentSchema.methods.escalateFollowUp = function(reason = 'no_response') {
+appointmentSchema.methods.escalateFollowUp = function (reason = 'no_response') {
   this.followUp.status = 'escalated';
   this.followUp.escalatedAt = new Date();
   this.followUp.escalationReason = reason;
@@ -626,10 +638,10 @@ appointmentSchema.methods.escalateFollowUp = function(reason = 'no_response') {
 };
 
 // UPDATED: Enhanced static methods
-appointmentSchema.statics.findPendingReminders = function(reminderType, method = null) {
+appointmentSchema.statics.findPendingReminders = function (reminderType, method = null) {
   const now = new Date();
   let query = {};
-  
+
   if (reminderType === '24_hour') {
     const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
     query = {
@@ -653,30 +665,30 @@ appointmentSchema.statics.findPendingReminders = function(reminderType, method =
       'reminders.1_hour.attemptCount': { $lt: 3 }
     };
   }
-  
+
   if (method) {
     query[`reminders.${reminderType}.method`] = method;
   }
-  
+
   return this.find(query);
 };
 
-appointmentSchema.statics.findPendingFollowUps = function(method = null) {
+appointmentSchema.statics.findPendingFollowUps = function (method = null) {
   let query = {
     'followUp.status': 'scheduled',
     'followUp.scheduledDate': { $lte: new Date() },
     'followUp.enabled': true,
     'followUp.attemptCount': { $lt: 3 }
   };
-  
+
   if (method) {
     query['followUp.method'] = method;
   }
-  
+
   return this.find(query);
 };
 
-appointmentSchema.statics.findCompletedWithoutFollowUp = function(hoursAgo = 24) {
+appointmentSchema.statics.findCompletedWithoutFollowUp = function (hoursAgo = 24) {
   const cutoffTime = new Date();
   cutoffTime.setHours(cutoffTime.getHours() - hoursAgo);
 
@@ -691,12 +703,12 @@ appointmentSchema.statics.findCompletedWithoutFollowUp = function(hoursAgo = 24)
   });
 };
 
-appointmentSchema.statics.findEscalationCandidates = function() {
+appointmentSchema.statics.findEscalationCandidates = function () {
   return this.find({
     'followUp.status': 'sent_message',
     'followUp.method': { $in: ['sms', 'whatsapp'] },
     'followUp.attemptCount': { $gte: 2 },
-    'followUp.sentAt': { 
+    'followUp.sentAt': {
       $lte: new Date(Date.now() - (2 * 60 * 60 * 1000)) // 2 hours ago
     }
   });

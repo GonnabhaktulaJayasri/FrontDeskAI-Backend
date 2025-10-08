@@ -11,6 +11,7 @@ import doctorRoutes from "./routes/doctors.js";
 import callLogRoutes from "./routes/callLogs.js";
 import appointmentRoutes from "./routes/appointments.js"
 import messageRoutes from "./routes/messages.js"
+import chatbotRoutes from "./routes/chatbot.js";
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use("/api/doctors", doctorRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/call-logs", callLogRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 app.get("/", (req, res) => {
     res.send("API is running...");

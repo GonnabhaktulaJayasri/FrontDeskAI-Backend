@@ -119,7 +119,7 @@ class MessageAutomationService {
                 // Determine communication method using NEW schema
                 const method = this.determineReminderMethod(appointment, reminderType);
                 
-                console.log(`📞📱 Processing ${reminderType} reminder for appointment ${appointment._id} via ${method}`);
+                console.log(`Processing ${reminderType} reminder for appointment ${appointment._id} via ${method}`);
 
                 if (method === 'call') {
                     await this.triggerReminderCall(appointment, reminderType);
@@ -215,10 +215,10 @@ class MessageAutomationService {
                 }
             });
 
-            console.log(`✅ Reminder call initiated for appointment ${appointment._id}`);
+            console.log(`Reminder call initiated for appointment ${appointment._id}`);
 
         } catch (error) {
-            console.error(`❌ Error with reminder call for appointment ${appointment._id}:`, error);
+            console.error(`Error with reminder call for appointment ${appointment._id}:`, error);
             await this.updateReminderStatus(appointment._id, reminderType, 'failed');
         }
     }
@@ -265,13 +265,13 @@ class MessageAutomationService {
                     }
                 });
 
-                console.log(`✅ Reminder message sent for appointment ${appointment._id}`);
+                console.log(`Reminder message sent for appointment ${appointment._id}`);
             } else {
                 throw new Error(result.error || 'Failed to send message');
             }
 
         } catch (error) {
-            console.error(`❌ Error with reminder message for appointment ${appointment._id}:`, error);
+            console.error(`Error with reminder message for appointment ${appointment._id}:`, error);
             await this.updateReminderStatus(appointment._id, reminderType, 'failed');
         }
     }
@@ -282,38 +282,82 @@ class MessageAutomationService {
     async checkAndSendFollowUps() {
         try {
             console.log('Checking for follow-up communications...');
-
-            // Find appointments needing follow-ups using NEW schema
+            
+            const now = new Date();
+            
+            // Find appointments needing follow-ups
             const appointments = await Appointment.find({
-                'followUp.status': 'scheduled',
-                'followUp.scheduledDate': { $lte: new Date() },
-                'followUp.enabled': true,
-                'followUp.attemptCount': { $lt: this.maxRetries }
+                $or: [
+                    // Case 1: Already scheduled follow-ups that are due
+                    {
+                        'followUp.status': 'scheduled',
+                        'followUp.scheduledDate': { $lte: now },
+                        'followUp.enabled': true,
+                        'followUp.attemptCount': { $lt: this.maxRetries }
+                    },
+                    // Case 2: Completed appointments needing auto-scheduling
+                    {
+                        status: 'completed',
+                        dateTime: { $lt: now }, // Past appointments
+                        'followUp.enabled': true,
+                        'followUp.status': 'not_scheduled'
+                    }
+                ]
             }).populate('patient doctor');
-
+            
             console.log(`Found ${appointments.length} appointments needing follow-ups`);
-
+            
             for (const appointment of appointments) {
                 if (!appointment.patient?.phone) {
                     console.log(`Skipping follow-up for appointment ${appointment._id} - no patient phone`);
                     continue;
                 }
-
-                // Determine method using NEW schema
-                const method = this.determineFollowUpMethod(appointment);
                 
-                console.log(`📞📱 Processing follow-up for appointment ${appointment._id} via ${method}`);
-
+                // Auto-schedule if status is 'not_scheduled'
+                if (appointment.followUp.status === 'not_scheduled') {
+                    const appointmentDate = new Date(appointment.dateTime);
+                    const followUpDate = new Date(appointmentDate);
+                    followUpDate.setDate(followUpDate.getDate() + 1); // CHANGED: 1 day after appointment (was 7)
+                    
+                    // Update the appointment
+                    appointment.followUp.status = 'scheduled';
+                    appointment.followUp.scheduledDate = followUpDate;
+                    appointment.followUp.attemptCount = 0;
+                    await appointment.save();
+                    
+                    console.log(`Auto-scheduled follow-up for appointment ${appointment._id} on ${followUpDate.toISOString()}`);
+                    
+                    // Check if follow-up is due now
+                    if (followUpDate > now) {
+                        console.log(`Follow-up scheduled for future date, skipping for now`);
+                        continue;
+                    }
+                }
+                
+                // Determine communication method
+                const method = this.determineFollowUpMethod(appointment);
+                console.log(`Processing follow-up for appointment ${appointment._id} via ${method}`);
+                
+                // Send follow-up
                 if (method === 'call') {
                     await this.triggerFollowUpCall(appointment);
                 } else {
                     await this.triggerFollowUpMessage(appointment, method);
                 }
-
-                // Brief delay
+                
+                // Update follow-up status after sending
+                await Appointment.findByIdAndUpdate(appointment._id, {
+                    'followUp.status': 'sent',
+                    'followUp.attemptCount': appointment.followUp.attemptCount + 1,
+                    'followUp.lastAttempt': new Date(),
+                    $inc: { 'communicationSummary.totalFollowUps': 1 }
+                });
+                
+                // Brief delay between communications
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
-
+            
+            console.log('Follow-up check completed');
         } catch (error) {
             console.error('Error checking follow-ups:', error);
         }
@@ -371,10 +415,10 @@ class MessageAutomationService {
                 }
             });
 
-            console.log(`✅ Follow-up call initiated for appointment ${appointment._id}`);
+            console.log(`Follow-up call initiated for appointment ${appointment._id}`);
 
         } catch (error) {
-            console.error(`❌ Error with follow-up call for appointment ${appointment._id}:`, error);
+            console.error(`Error with follow-up call for appointment ${appointment._id}:`, error);
             await this.updateFollowUpStatus(appointment._id, 'failed', error.message);
         }
     }
@@ -429,13 +473,13 @@ class MessageAutomationService {
                     }
                 });
 
-                console.log(`✅ Follow-up message sent for appointment ${appointment._id}`);
+                console.log(`Follow-up message sent for appointment ${appointment._id}`);
             } else {
                 throw new Error(result.error || 'Failed to send follow-up message');
             }
 
         } catch (error) {
-            console.error(`❌ Error with follow-up message for appointment ${appointment._id}:`, error);
+            console.error(`Error with follow-up message for appointment ${appointment._id}:`, error);
             await this.updateFollowUpStatus(appointment._id, 'failed', error.message);
         }
     }
@@ -829,7 +873,7 @@ export default messageAutomationService;
 //                 // Determine communication method using NEW schema
 //                 const method = this.determineReminderMethod(appointment, reminderType);
                 
-//                 console.log(`📞📱 Processing ${reminderType} reminder for appointment ${appointment._id} via ${method}`);
+//                 console.log(`Processing ${reminderType} reminder for appointment ${appointment._id} via ${method}`);
 
 //                 if (method === 'call') {
 //                     await this.triggerReminderCall(appointment, reminderType);
@@ -925,10 +969,10 @@ export default messageAutomationService;
 //                 }
 //             });
 
-//             console.log(`✅ Reminder call initiated for appointment ${appointment._id}`);
+//             console.log(`Reminder call initiated for appointment ${appointment._id}`);
 
 //         } catch (error) {
-//             console.error(`❌ Error with reminder call for appointment ${appointment._id}:`, error);
+//             console.error(`Error with reminder call for appointment ${appointment._id}:`, error);
 //             await this.updateReminderStatus(appointment._id, reminderType, 'failed');
 //         }
 //     }
@@ -982,13 +1026,13 @@ export default messageAutomationService;
 //                     }
 //                 });
 
-//                 console.log(`✅ Reminder message sent for appointment ${appointment._id}`);
+//                 console.log(`Reminder message sent for appointment ${appointment._id}`);
 //             } else {
 //                 throw new Error('Failed to send message');
 //             }
 
 //         } catch (error) {
-//             console.error(`❌ Error with reminder message for appointment ${appointment._id}:`, error);
+//             console.error(`Error with reminder message for appointment ${appointment._id}:`, error);
 //             await this.updateReminderStatus(appointment._id, reminderType, 'failed');
 //         }
 //     }
@@ -1019,7 +1063,7 @@ export default messageAutomationService;
 //                 // Determine method using NEW schema
 //                 const method = this.determineFollowUpMethod(appointment);
                 
-//                 console.log(`📞📱 Processing follow-up for appointment ${appointment._id} via ${method}`);
+//                 console.log(`Processing follow-up for appointment ${appointment._id} via ${method}`);
 
 //                 if (method === 'call') {
 //                     await this.triggerFollowUpCall(appointment);
@@ -1088,10 +1132,10 @@ export default messageAutomationService;
 //                 }
 //             });
 
-//             console.log(`✅ Follow-up call initiated for appointment ${appointment._id}`);
+//             console.log(`Follow-up call initiated for appointment ${appointment._id}`);
 
 //         } catch (error) {
-//             console.error(`❌ Error with follow-up call for appointment ${appointment._id}:`, error);
+//             console.error(`Error with follow-up call for appointment ${appointment._id}:`, error);
 //             await this.updateFollowUpStatus(appointment._id, 'failed', error.message);
 //         }
 //     }
@@ -1151,13 +1195,13 @@ export default messageAutomationService;
 //                     }
 //                 });
 
-//                 console.log(`✅ Follow-up message sent for appointment ${appointment._id}`);
+//                 console.log(`Follow-up message sent for appointment ${appointment._id}`);
 //             } else {
 //                 throw new Error('Failed to send follow-up message');
 //             }
 
 //         } catch (error) {
-//             console.error(`❌ Error with follow-up message for appointment ${appointment._id}:`, error);
+//             console.error(`Error with follow-up message for appointment ${appointment._id}:`, error);
 //             await this.updateFollowUpStatus(appointment._id, 'failed', error.message);
 //         }
 //     }

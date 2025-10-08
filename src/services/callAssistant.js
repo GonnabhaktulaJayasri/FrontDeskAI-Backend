@@ -1465,12 +1465,14 @@ function getInstructions(callContext, patientData, appointmentData) {
     if (patientData) {
         patientContext = `
             PATIENT CONTEXT:
-            - Patient Name: ${patientData.name}
+            - Patient Name: ${patientData.firstName}
             - Phone: ${patientData.phone}
             - Previous visits: ${patientData.totalVisits}
             ${patientData.preferredDoctor ? `- Preferred Doctor: ${patientData.preferredDoctor}` : ''}
             ${patientData.age ? `- Age: ${patientData.age}` : ''}
-            ${patientData.gender ? `- Gender: ${patientData.gender}` : ''}`
+            ${patientData.gender ? `- Gender: ${patientData.gender}` : ''}
+            ${patientData.dob ? `- dob: ${patientData.dob}` : ''}`
+
 
 
     }
@@ -1533,7 +1535,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             case 'appointment_reminder':
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} for an OUTBOUND appointment reminder. The patient should be expecting this call or may not be. Be professional and clear about why you're calling.
 
-                GREETING: "Hello, This is the Virtual assistant from ${hospitalName} calling. May I speak with ${patientData?.name || 'the patient'}? I'm calling to remind you about your upcoming appointment."`;
+                GREETING: "Hello, This is the Virtual assistant from ${hospitalName} calling. May I speak with ${patientData?.firstName || 'the patient'}? I'm calling to remind you about your upcoming appointment."`;
 
                 // ENHANCED: Add timing-specific messaging
                 const timingMessage = callContext.reminderType === '24_hour' ?
@@ -1560,7 +1562,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             case 'follow_up':
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} for an OUTBOUND follow-up call. This is a check-in call to see how the patient is doing AFTER their recent appointment.
 
-                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}? I'm calling to follow up on your recent visit with us."`;
+                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.firstName || 'the patient'}? I'm calling to follow up on your recent visit with us."`;
 
                 specificInstructions = `
                 FOLLOW-UP SPECIFIC INSTRUCTIONS:
@@ -1579,7 +1581,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             case 'prescription_reminder':
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} regarding prescription refills.
 
-                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}? I'm calling about your prescription refill."`;
+                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.firstName || 'the patient'}? I'm calling about your prescription refill."`;
 
                 specificInstructions = `
                 PRESCRIPTION REMINDER INSTRUCTIONS:
@@ -1593,7 +1595,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             default:
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName}. Be professional and clearly state why you're calling.
 
-                GREETING: "Hello,I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.name || 'the patient'}?"`;
+                GREETING: "Hello,I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.firstName || 'the patient'}?"`;
 
                 specificInstructions = `
                 GENERAL OUTBOUND INSTRUCTIONS:
@@ -1620,7 +1622,7 @@ function getInstructions(callContext, patientData, appointmentData) {
 
         GREETING:
         - For new patients: "This is Virtual assistant,Thank you for calling ${hospitalName}. How can I help you today?"
-        - For returning patients: "Hello ${patientData?.name || 'there'}!, I am Virtual assistant, How are you doing? What can I help you with today?"`;
+        - For returning patients: "Hello ${patientData?.firstName || 'there'}!, I am Virtual assistant, How are you doing? What can I help you with today?"`;
 
         specificInstructions = `
         INBOUND CALL INSTRUCTIONS:
@@ -2020,13 +2022,25 @@ export async function callAssistant(connection, req) {
                             parameters: {
                                 type: "object",
                                 properties: {
-                                    patient_name: {
+                                    patient_firstname: {
                                         type: "string",
-                                        description: "Patient's full name (use stored name for returning patients)"
+                                        description: "Patient's first name (use stored firstName for returning patients)"
+                                    },
+                                    patient_lastname: {
+                                        type: "string",
+                                        description: "Patient's last name (use stored lastName for returning patients)"
                                     },
                                     patient_phone: {
                                         type: "string",
                                         description: "Patient's phone number (use stored phone for returning patients)"
+                                    },
+                                    patient_dob: {
+                                        type: "string",
+                                        description: "Patient's dob (use stored dob for returning patients)"
+                                    },
+                                    patient_age: {
+                                        type: "string",
+                                        description: "Patient's age (use stored age for returning patients)"
                                     },
                                     doctor_name: {
                                         type: "string",
@@ -2081,8 +2095,13 @@ export async function callAssistant(connection, req) {
                             parameters: {
                                 type: "object",
                                 properties: {
-                                    name: { type: "string", description: "Patient's name" },
+                                    firstName: { type: "string", description: "Patient's first name" },
+                                    lastName: { type: "string", description: "Patient's last name" },
                                     age: { type: "number", description: "Patient's age" },
+                                    dob: {
+                                        type: "string",
+                                        description: "Patient's date of birth in YYYY-MM-DD format"
+                                    },
                                     gender: { type: "string", enum: ["male", "female", "other"] },
                                     preferred_doctor: { type: "string", description: "Preferred doctor name" },
                                     preferred_time: { type: "string", description: "Preferred appointment time" }
@@ -2219,14 +2238,14 @@ export async function callAssistant(connection, req) {
                         {
                             type: "function",
                             name: "end_call",
-                            description: "End the call ONLY when patient explicitly indicates conversation is complete. Do NOT call for simple 'thank you' responses during ongoing conversation. Wait until patient says phrases like 'that's all', 'nothing else', 'goodbye', or 'have a good day' combined with thanks.",
+                            description: "CRITICAL: You must say your complete goodbye message BEFORE calling this function. After calling this function, you will NOT be able to say anything else. Example flow: 'Thank you for calling! Have a wonderful day!' [then call end_call]. Do NOT call this function until you have finished speaking your goodbye.",
                             parameters: {
                                 type: "object",
                                 properties: {
                                     reason: {
                                         type: "string",
-                                        description: "Specific reason for ending call - must be clear ending signal from patient",
-                                        enum: ["conversation_complete", "patient_goodbye", "patient_finished", "patient_hung_up"]
+                                        description: "Reason for ending",
+                                        enum: ["conversation_complete", "patient_goodbye", "patient_finished"]
                                     }
                                 },
                                 required: ["reason"]
@@ -2479,18 +2498,18 @@ export async function callAssistant(connection, req) {
             // Different prompts for different outbound call types
             switch (callContext.callType) {
                 case 'appointment_reminder':
-                    greetingPrompt = `You are making an outbound appointment reminder call to ${patientData?.name || 'a patient'} from ${callContext.hospital.name}. Start by greeting them professionally and explaining the purpose of your call. The appointment details are in your instructions. Be clear and helpful.`;
+                    greetingPrompt = `You are making an outbound appointment reminder call to ${patientData?.firstName || 'a patient'} from ${callContext.hospital.name}. Start by greeting them professionally and explaining the purpose of your call. The appointment details are in your instructions. Be clear and helpful.`;
                     break;
                 case 'follow_up':
-                    greetingPrompt = `You are making an outbound follow-up call to ${patientData?.name || 'a patient'} from ${callContext.hospital.name}. Start by greeting them warmly and explaining you're calling to check on their wellbeing after their recent visit. Be caring and professional.`;
+                    greetingPrompt = `You are making an outbound follow-up call to ${patientData?.firstName || 'a patient'} from ${callContext.hospital.name}. Start by greeting them warmly and explaining you're calling to check on their wellbeing after their recent visit. Be caring and professional.`;
                     break;
                 default:
-                    greetingPrompt = `You are making an outbound call to ${patientData?.name || 'a patient'} from ${callContext.hospital.name}. Start by greeting them professionally and clearly explaining the purpose of your call. ${callContext.reason ? `The reason for the call is: ${callContext.reason}` : ''}`;
+                    greetingPrompt = `You are making an outbound call to ${patientData?.firstName || 'a patient'} from ${callContext.hospital.name}. Start by greeting them professionally and clearly explaining the purpose of your call. ${callContext.reason ? `The reason for the call is: ${callContext.reason}` : ''}`;
             }
         } else {
             // Inbound call greeting (existing logic)
             if (patientData) {
-                greetingPrompt = `A returning patient ${patientData.name} has just called ${callContext.hospital.name}. Start with your standard greeting for returning patients. Be warm and professional.`;
+                greetingPrompt = `A returning patient ${patientData?.firstName} has just called ${callContext.hospital.name}. Start with your standard greeting for returning patients. Be warm and professional.`;
             } else {
                 greetingPrompt = `A new patient has just called ${callContext.hospital.name}. Start with your standard greeting for new patients. Be warm and professional.`;
             }
@@ -2576,29 +2595,56 @@ export async function callAssistant(connection, req) {
     const handleFunctionCall = async (callId, functionName, args) => {
         try {
             let result = null;
-            let shouldContinueConversation = true;
+            // let shouldContinueConversation = true;
 
             switch (functionName) {
+                // case 'end_call':
+                //     detectedIntent = 'end_call';
+                //     extractedEntities = { ...extractedEntities, call_ending: args };
+                //     callEndingInProgress = true;
+                //     // shouldContinueConversation = false;
+                //     result = {
+                //         status: "acknowledged"
+                //     };
+
+                //     result = {
+                //         success: true,
+                //         action: 'end_call_initiated',
+                //         internal_message: 'Call ending process started - waiting for message completion',
+                //         reason: args.reason
+                //     };
+
+                //     setTimeout(() => {
+                //         if (!finalMessageMarkReceived) {
+                //             console.log('Timeout reached, ending call');
+                //             endCallSafely();
+                //         }
+                //     }, 4000); // Increased to 8 seconds to allow full message
+                //     break;
+
                 case 'end_call':
                     detectedIntent = 'end_call';
                     extractedEntities = { ...extractedEntities, call_ending: args };
                     callEndingInProgress = true;
-                    shouldContinueConversation = false;
 
                     result = {
-                        success: true,
-                        action: 'end_call_initiated',
-                        internal_message: 'Call ending process started - waiting for message completion',
-                        reason: args.reason
+                        status: "acknowledged"
                     };
 
-                    setTimeout(() => {
-                        if (!finalMessageMarkReceived) {
-                            console.log('Timeout reached, ending call');
-                            endCallSafely();
+                    const endCallResponse = {
+                        type: 'conversation.item.create',
+                        item: {
+                            type: 'function_call_output',
+                            call_id: callId,
+                            output: JSON.stringify(result)
                         }
-                    }, 4000); // Increased to 8 seconds to allow full message
-                    break;
+                    };
+                    openAiWs.send(JSON.stringify(endCallResponse));
+                    setTimeout(() => {
+                        console.log('Timeout reached, ending call');
+                        endCallSafely();
+                    }, 3000);
+                    return;
 
                 case 'get_my_appointments':
                     result = {
@@ -2626,8 +2672,11 @@ export async function callAssistant(connection, req) {
 
                     // Use stored patient data for returning patients
                     const appointmentData = {
-                        patient_name: args.patient_name || patientData?.name,
+                        patient_firstname: args.patient_firstname || patientData?.firstName,
+                        patient_lastname: args.patient_lastname || patientData?.lastName,
                         patient_phone: args.patient_phone || patientData?.phone || from,
+                        patient_dob: args.patient_dob || patientData?.dob,
+                        patient_age: args.patient_age || patientData?.age,
                         doctor_name: args.doctor_name,
                         date: args.date,
                         time: args.time,
@@ -2682,7 +2731,7 @@ export async function callAssistant(connection, req) {
 
                     // Use stored patient data
                     const refillData = {
-                        patient_name: args.patient_name || patientData?.name,
+                        patient_name: args.patient_name || patientData?.firstName,
                         patient_phone: args.patient_phone || patientData?.phone || from,
                         ...args
                     };
@@ -2826,12 +2875,7 @@ export async function callAssistant(connection, req) {
             };
 
             openAiWs.send(JSON.stringify(functionResponse));
-            // Only continue conversation if not ending the call
-            if (shouldContinueConversation) {
-                openAiWs.send(JSON.stringify({ type: 'response.create' }));
-            } else {
-                console.log('End call triggered - not sending response.create');
-            }
+            openAiWs.send(JSON.stringify({ type: 'response.create' }));
 
         } catch (error) {
             console.error('Error handling function call:', error);
@@ -2953,6 +2997,17 @@ export async function callAssistant(connection, req) {
             const updateData = {};
 
             if (info.name) updateData.name = info.name;
+            if (info.email) updateData.email = info.email;
+            if (info.dob) {
+                // If format is "YYYY-MM-DD"
+                // updateData.dob = new Date(info.dob);
+
+                // Or if AI sends "YYYYMMDD" format, convert it:
+                const year = info.dob.substring(0, 4);
+                const month = info.dob.substring(4, 6);
+                const day = info.dob.substring(6, 8);
+                updateData.dob = new Date(`${year}-${month}-${day}`);
+            }
             if (info.age) updateData.age = info.age;
             if (info.gender) updateData.gender = info.gender;
 
@@ -2990,9 +3045,11 @@ export async function callAssistant(connection, req) {
             if (patient) {
                 patientData = {
                     id: patient._id,
-                    name: patient.name,
+                    firstName: patient.firstName,
+                    lastName: patient.lastName,
                     phone: patient.phone,
                     email: patient.email,
+                    dob: patient.dob,
                     age: patient.age,
                     gender: patient.gender,
                     preferredDoctor: patient.preferredDoctor?.name,

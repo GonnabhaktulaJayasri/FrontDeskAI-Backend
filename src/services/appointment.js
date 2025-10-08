@@ -3,12 +3,12 @@ import Appointment from "../models/Appointment.js";
 import Doctor from "../models/Doctor.js";
 import Patient from "../models/Patient.js";
 
-export const bookAppointment = async ({ patient_name, patient_phone, doctor_name, date, time, reason }) => {
+export const bookAppointment = async ({ patient_firstname, patient_lastname, patient_phone, patient_dob, patient_age, doctor_name, date, time, reason }) => {
     try {
         // Step 1: Find or create patient
         let patient = await Patient.findOne({ phone: patient_phone });
         if (!patient) {
-            patient = new Patient({ name: patient_name, phone: patient_phone });
+            patient = new Patient({ firstName: patient_firstname, lastName: patient_lastname, phone: patient_phone, dob: patient_dob, age: patient_age });
             await patient.save();
         }
 
@@ -66,9 +66,12 @@ export const rescheduleAppointmentByDetails = async (rescheduleData) => {
             // Clean phone number - remove spaces, dashes, parentheses
             const cleanPhone = patient_phone.replace(/[\s\-\(\)]/g, '');
             patientQuery.$or = [
-                { phoneNumber: patient_phone },
+                { phone: patient_phone },        // ADDED: your model uses 'phone'
+                { phone: cleanPhone },            // ADDED
+                { phoneNumber: patient_phone },   // Keep for backward compatibility
                 { phoneNumber: cleanPhone },
-                { phoneNumber: new RegExp(cleanPhone.slice(-10)) } // Last 10 digits
+                { phone: new RegExp(cleanPhone.slice(-10)) },
+                { phoneNumber: new RegExp(cleanPhone.slice(-10)) }
             ];
         }
 
