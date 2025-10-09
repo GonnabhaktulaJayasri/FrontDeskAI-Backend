@@ -364,34 +364,24 @@ export const handleIncomingMessage = async (req, res) => {
 
         // Only process messages added to conversations
         if (EventType !== 'onMessageAdded') {
-            console.log(`Ignoring conversation event: ${EventType}`);
             return res.status(200).send();
         }
-
-        // Identify which hospital this message is for by the To number
-        const toNumber = req.body.To?.replace('whatsapp:', '');
+        
         let hospital = null;
-        
-        if (toNumber) {
-            hospital = await Hospital.findOne({ twilioPhoneNumber: toNumber });
-        }
-        
-        if (!hospital) {
-            console.warn(`No hospital found for number: ${toNumber}`);
-            // Try to find any hospital as fallback
-            hospital = await Hospital.findOne();
+
+        if (!hospital && MessagingServiceSid) {
+            hospital = await Hospital.findOne({
+                twilioMessagingServiceSid: MessagingServiceSid
+            });
+
+            if (hospital) {
+                console.log('Hospital found from MessagingServiceSid:', hospital.name);
+            }
         }
 
-        if (!hospital || !hospital.twilioPhoneNumber) {
-            console.error('No hospital with Twilio number found');
-            return res.status(200).send();
-        }
-
-        // Skip messages sent by this hospital's service
-        const hospitalTwilioNumber = hospital.twilioPhoneNumber;
-        if (Author === hospitalTwilioNumber ||
-            Author === `whatsapp:${hospitalTwilioNumber}` ||
-            Author?.startsWith('whatsapp:' + hospitalTwilioNumber?.replace('+', ''))) {
+        if (Author === hospital.twilioPhoneNumber ||
+            Author === `whatsapp:${hospital.twilioWhatsappNumber}` ||
+            Author?.startsWith('whatsapp:' + hospital.twilioPhoneNumber?.replace('+', ''))) {
             console.log('Skipping outbound message from our service');
             return res.status(200).send();
         }
@@ -409,12 +399,13 @@ export const handleIncomingMessage = async (req, res) => {
         const fakeReq = {
             body: {
                 From: Author,
-                To: hospitalTwilioNumber,
+                To: isWhatsApp ? hospital.twilioWhatsappNumber : hospital.twilioPhone,
                 Body: Body,
                 MessageSid: MessageSid,
                 ConversationSid: ConversationSid,
                 SmsStatus: 'received'
-            }
+            },
+            hospital: hospital
         };
 
         // Process with enhanced AI service, passing hospital info

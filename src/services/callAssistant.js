@@ -1453,9 +1453,10 @@ import Doctor from "../models/Doctor.js";
 import { bookAppointment, findPatientAppointments, cancelAppointmentByDetails, rescheduleAppointmentByDetails } from "./appointment.js";
 import { processPrescriptionRefill } from './prescriptionRefill.js';
 import Appointment from "../models/Appointment.js";
+import { AudioBufferManager, transcribeAudio } from "./transcription.js";
 
 function getInstructions(callContext, patientData, appointmentData) {
-    const hospitalName = callContext.hospital.name || 'City General Hospital';
+    const hospitalName = callContext.hospital?.name || 'City General Hospital';
     const hospitalPhone = callContext.hospital.phonenumber || 'our main number';
     const hospitalAddress = callContext.hospital.hospitalAddress || 'our hospital';
     const departments = callContext.hospital.departments || [];
@@ -1535,7 +1536,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             case 'appointment_reminder':
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} for an OUTBOUND appointment reminder. The patient should be expecting this call or may not be. Be professional and clear about why you're calling.
 
-                GREETING: "Hello, This is the Virtual assistant from ${hospitalName} calling. May I speak with ${patientData?.firstName || 'the patient'}? I'm calling to remind you about your upcoming appointment."`;
+                GREETING: "Hello, This is the Virtual assistant from ${hospitalName} calling. Am I speaking with ${patientData?.firstName || 'the patient'}? I'm calling to remind you about your upcoming appointment."`;
 
                 // ENHANCED: Add timing-specific messaging
                 const timingMessage = callContext.reminderType === '24_hour' ?
@@ -1562,7 +1563,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             case 'follow_up':
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} for an OUTBOUND follow-up call. This is a check-in call to see how the patient is doing AFTER their recent appointment.
 
-                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.firstName || 'the patient'}? I'm calling to follow up on your recent visit with us."`;
+                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. Am I speaking with ${patientData?.firstName || 'the patient'}? I'm calling to follow up on your recent visit with us."`;
 
                 specificInstructions = `
                 FOLLOW-UP SPECIFIC INSTRUCTIONS:
@@ -1581,7 +1582,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             case 'prescription_reminder':
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName} regarding prescription refills.
 
-                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.firstName || 'the patient'}? I'm calling about your prescription refill."`;
+                GREETING: "Hello, I am Virtual assistant calling from ${hospitalName}. Am I speaking with ${patientData?.firstName || 'the patient'}? I'm calling about your prescription refill."`;
 
                 specificInstructions = `
                 PRESCRIPTION REMINDER INSTRUCTIONS:
@@ -1595,7 +1596,7 @@ function getInstructions(callContext, patientData, appointmentData) {
             default:
                 roleAndGreeting = `You are an Virtual assistant calling from ${hospitalName}. Be professional and clearly state why you're calling.
 
-                GREETING: "Hello,I am Virtual assistant calling from ${hospitalName}. May I speak with ${patientData?.firstName || 'the patient'}?"`;
+                GREETING: "Hello,I am Virtual assistant calling from ${hospitalName}. Am I speaking with ${patientData?.firstName || 'the patient'}?"`;
 
                 specificInstructions = `
                 GENERAL OUTBOUND INSTRUCTIONS:
@@ -1622,7 +1623,7 @@ function getInstructions(callContext, patientData, appointmentData) {
 
         GREETING:
         - For new patients: "This is Virtual assistant,Thank you for calling ${hospitalName}. How can I help you today?"
-        - For returning patients: "Hello ${patientData?.firstName || 'there'}!, I am Virtual assistant, How are you doing? What can I help you with today?"`;
+        - For returning patients: "Hello ${patientData?.firstName || 'there'}!, I am Virtual assistant from ${hospitalName}, How are you doing? What can I help you with today?"`;
 
         specificInstructions = `
         INBOUND CALL INSTRUCTIONS:
@@ -1827,6 +1828,11 @@ export async function callAssistant(connection, req) {
     let appointmentData;
     let transferInProgress = false;
 
+    let userAudioBuffer = new AudioBufferManager(800); // Minimum 800ms of audio
+    let isUserSpeaking = false;
+    let speechEndTimeout = null;
+    let transcriptionInProgress = false;
+
     // Handle incoming messages from Twilio
     connection.on('message', async (message) => {
         try {
@@ -1881,6 +1887,9 @@ export async function callAssistant(connection, req) {
                     // if (wavWriter1Open) {
                     //     wavWriter1.write(pcm16Buffer);
                     // }
+                    if (isUserSpeaking) {
+                        userAudioBuffer.addChunk(ulawBuffer);
+                    }
 
                     // Send to OpenAI
                     const audioAppend = {
@@ -2412,7 +2421,26 @@ export async function callAssistant(connection, req) {
 
                 if (response.type === 'input_audio_buffer.speech_started') {
                     console.log('User started speaking');
+                    isUserSpeaking = true;
+                    userAudioBuffer.clear();
+
+                    // Clear any pending timeout
+                    if (speechEndTimeout) {
+                        clearTimeout(speechEndTimeout);
+                        speechEndTimeout = null;
+                    }
+
                     handleSpeechStartedEvent();
+                }
+
+                if (response.type === 'input_audio_buffer.speech_stopped') {
+                    console.log('User stopped speaking');
+                    isUserSpeaking = false;
+
+                    // Wait a bit to ensure we have all audio
+                    speechEndTimeout = setTimeout(async () => {
+                        await processUserSpeech();
+                    }, 300);
                 }
 
                 if (response.type === 'conversation.item.input_audio_transcription.completed') {
@@ -2643,7 +2671,7 @@ export async function callAssistant(connection, req) {
                     setTimeout(() => {
                         console.log('Timeout reached, ending call');
                         endCallSafely();
-                    }, 3000);
+                    }, 8000);
                     return;
 
                 case 'get_my_appointments':
@@ -2904,7 +2932,7 @@ export async function callAssistant(connection, req) {
             text: message,
             timestamp: new Date() // ISO timestamp
         });
-        console.log('Transcript line added:', speaker, message);
+        // console.log('Transcript line added:', speaker, message);
     };
 
     // Create call log entry
@@ -3340,6 +3368,55 @@ export async function callAssistant(connection, req) {
             }
         }
     };
+
+    async function processUserSpeech() {
+        if (transcriptionInProgress || !userAudioBuffer.hasEnoughAudio()) {
+            console.log('Skipping transcription - insufficient audio or already in progress');
+            return;
+        }
+
+        transcriptionInProgress = true;
+
+        try {
+            const audioBuffer = userAudioBuffer.getBuffer();
+            const audioSize = userAudioBuffer.getSize();
+
+            // Call transcription service
+            const result = await transcribeAudio(audioBuffer, 'mulaw');
+
+            if (result.success && result.text) {
+
+                // Add to transcript
+                addToTranscript('User', result.text);
+
+                // Optional: Send transcription to OpenAI for context
+                // This helps OpenAI understand what the user said
+                const contextItem = {
+                    type: "conversation.item.create",
+                    item: {
+                        type: "message",
+                        role: "user",
+                        content: [{
+                            type: "input_text",
+                            text: `[User said: "${result.text}"]`
+                        }]
+                    }
+                };
+
+                if (openAiWs && openAiWs.readyState === WebSocket.OPEN) {
+                    openAiWs.send(JSON.stringify(contextItem));
+                }
+            } else {
+                console.log('Transcription failed or returned empty text');
+            }
+
+        } catch (error) {
+            console.error('Error processing user speech:', error);
+        } finally {
+            transcriptionInProgress = false;
+            userAudioBuffer.clear();
+        }
+    }
 }
 
 

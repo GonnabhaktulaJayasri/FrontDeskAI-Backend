@@ -629,7 +629,7 @@ async function initiateAppointmentCall(patientData, hospitalId = null) {
             phoneNumber: phoneNumber,
             patientId: patientData.patientId || null,
             hospitalId: hospitalId,
-            reason: 'Appointment booking confirmation from chatbot',
+            reason: 'Appointment booking confirmation',
             callType: 'general'
         });
 

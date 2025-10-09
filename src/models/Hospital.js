@@ -21,6 +21,11 @@ const hospitalSchema = new mongoose.Schema({
         unique: true,
         sparse: true
     },
+    twilioMessagingServiceSid: {
+        type: String,
+        unique: true,
+        sparse: true 
+    },
     createdAt: { type: Date, default: Date.now },
     logoutAt: { type: Date, default: null }
 });
