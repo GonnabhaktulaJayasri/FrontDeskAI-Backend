@@ -3,3 +3,6 @@ dist/
 build/
 .env
 *.log
+
+user_responses/
+ai_responses/
