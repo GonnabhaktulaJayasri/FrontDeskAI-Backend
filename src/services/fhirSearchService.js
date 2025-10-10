@@ -14,12 +14,12 @@ class FHIRSearchService {
      */
     async findOrImportPatientByPhone(phoneNumber) {
         try {
-            console.log(`🔍 Searching FHIR for patient with phone: ${phoneNumber}`);
+            console.log(`Searching FHIR for patient with phone: ${phoneNumber}`);
 
             // First check MongoDB
             let patient = await Patient.findOne({ phone: phoneNumber });
             if (patient && patient.fhirSyncStatus === 'synced') {
-                console.log(`✅ Patient found in MongoDB (already synced): ${patient._id}`);
+                console.log(`Patient found in MongoDB (already synced): ${patient._id}`);
                 return {
                     success: true,
                     source: 'mongodb',
@@ -33,7 +33,7 @@ class FHIRSearchService {
             });
 
             if (!fhirSearchResult.success || fhirSearchResult.total === 0) {
-                console.log(`📭 No patient found in FHIR for phone: ${phoneNumber}`);
+                console.log(`No patient found in FHIR for phone: ${phoneNumber}`);
 
                 // Return existing MongoDB patient if exists
                 if (patient) {
@@ -52,7 +52,7 @@ class FHIRSearchService {
 
             // Patient found in FHIR - import to MongoDB
             const fhirPatient = fhirSearchResult.entries[0].resource;
-            console.log(`✅ Patient found in FHIR: ${fhirPatient.id}`);
+            console.log(`Patient found in FHIR: ${fhirPatient.id}`);
 
             // Convert FHIR Patient to MongoDB format
             const mongoPatientData = this.convertFHIRPatientToMongo(fhirPatient);
@@ -65,7 +65,7 @@ class FHIRSearchService {
                 patient.fhirLastSync = new Date();
                 patient._skipFhirSync = true; // Prevent re-sync to FHIR
                 await patient.save();
-                console.log(`✅ Updated existing MongoDB patient from FHIR: ${patient._id}`);
+                console.log(`Updated existing MongoDB patient from FHIR: ${patient._id}`);
             } else {
                 // Create new patient in MongoDB
                 patient = new Patient({
@@ -76,7 +76,7 @@ class FHIRSearchService {
                 });
                 patient._skipFhirSync = true; // Prevent re-sync to FHIR
                 await patient.save();
-                console.log(`✅ Created new MongoDB patient from FHIR: ${patient._id}`);
+                console.log(`Created new MongoDB patient from FHIR: ${patient._id}`);
             }
 
             return {
@@ -87,7 +87,7 @@ class FHIRSearchService {
             };
 
         } catch (error) {
-            console.error('❌ Error in findOrImportPatientByPhone:', error);
+            console.error('Error in findOrImportPatientByPhone:', error);
 
             // Fallback to MongoDB
             const patient = await Patient.findOne({ phone: phoneNumber });
@@ -148,12 +148,12 @@ class FHIRSearchService {
      */
     async findOrImportDoctorByName(doctorName) {
         try {
-            console.log(`🔍 Searching FHIR for practitioner: ${doctorName}`);
+            console.log(`Searching FHIR for practitioner: ${doctorName}`);
 
             // First check MongoDB
             let doctor = await Doctor.findOne({ name: doctorName });
             if (doctor && doctor.fhirSyncStatus === 'synced') {
-                console.log(`✅ Doctor found in MongoDB (already synced): ${doctor._id}`);
+                console.log(`Doctor found in MongoDB (already synced): ${doctor._id}`);
                 return {
                     success: true,
                     source: 'mongodb',
@@ -167,7 +167,7 @@ class FHIRSearchService {
             });
 
             if (!fhirSearchResult.success || fhirSearchResult.total === 0) {
-                console.log(`📭 No practitioner found in FHIR for: ${doctorName}`);
+                console.log(`No practitioner found in FHIR for: ${doctorName}`);
 
                 if (doctor) {
                     return {
@@ -185,7 +185,7 @@ class FHIRSearchService {
 
             // Practitioner found in FHIR
             const fhirPractitioner = fhirSearchResult.entries[0].resource;
-            console.log(`✅ Practitioner found in FHIR: ${fhirPractitioner.id}`);
+            console.log(`Practitioner found in FHIR: ${fhirPractitioner.id}`);
 
             const mongoDoctorData = this.convertFHIRPractitionerToMongo(fhirPractitioner);
 
@@ -196,7 +196,7 @@ class FHIRSearchService {
                 doctor.fhirLastSync = new Date();
                 doctor._skipFhirSync = true;
                 await doctor.save();
-                console.log(`✅ Updated existing MongoDB doctor from FHIR: ${doctor._id}`);
+                console.log(`Updated existing MongoDB doctor from FHIR: ${doctor._id}`);
             } else {
                 doctor = new Doctor({
                     ...mongoDoctorData,
@@ -206,7 +206,7 @@ class FHIRSearchService {
                 });
                 doctor._skipFhirSync = true;
                 await doctor.save();
-                console.log(`✅ Created new MongoDB doctor from FHIR: ${doctor._id}`);
+                console.log(`Created new MongoDB doctor from FHIR: ${doctor._id}`);
             }
 
             return {
@@ -217,7 +217,7 @@ class FHIRSearchService {
             };
 
         } catch (error) {
-            console.error('❌ Error in findOrImportDoctorByName:', error);
+            console.error('Error in findOrImportDoctorByName:', error);
 
             const doctor = await Doctor.findOne({ name: doctorName });
             if (doctor) {

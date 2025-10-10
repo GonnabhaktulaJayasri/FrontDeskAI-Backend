@@ -61,7 +61,7 @@ class FHIRService {
             const fhirPatient = this.convertToFHIRPatient(mongoPatient);
             const response = await this.axios.post('/Patient', fhirPatient);
             
-            console.log('✅ Patient created in FHIR server:', response.data.id);
+            console.log('Patient created in FHIR server:', response.data.id);
             
             return {
                 success: true,
@@ -69,7 +69,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error creating FHIR patient:', error.response?.data || error.message);
+            console.error('Error creating FHIR patient:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -87,14 +87,14 @@ class FHIRService {
             
             const response = await this.axios.put(`/Patient/${fhirId}`, fhirPatient);
             
-            console.log('✅ Patient updated in FHIR server:', fhirId);
+            console.log('Patient updated in FHIR server:', fhirId);
             
             return {
                 success: true,
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error updating FHIR patient:', error.response?.data || error.message);
+            console.error('Error updating FHIR patient:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -113,7 +113,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error fetching FHIR patient:', error.response?.data || error.message);
+            console.error('Error fetching FHIR patient:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -134,7 +134,7 @@ class FHIRService {
                 entries: response.data.entry || []
             };
         } catch (error) {
-            console.error('❌ Error searching FHIR patients:', error.response?.data || error.message);
+            console.error('Error searching FHIR patients:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -209,7 +209,7 @@ class FHIRService {
             
             const response = await this.axios.post('/Appointment', fhirAppointment);
             
-            console.log('✅ Appointment created in FHIR server:', response.data.id);
+            console.log('Appointment created in FHIR server:', response.data.id);
             
             return {
                 success: true,
@@ -217,7 +217,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error creating FHIR appointment:', error.response?.data || error.message);
+            console.error('Error creating FHIR appointment:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -239,14 +239,14 @@ class FHIRService {
             
             const response = await this.axios.put(`/Appointment/${fhirId}`, fhirAppointment);
             
-            console.log('✅ Appointment updated in FHIR server:', fhirId);
+            console.log('Appointment updated in FHIR server:', fhirId);
             
             return {
                 success: true,
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error updating FHIR appointment:', error.response?.data || error.message);
+            console.error('Error updating FHIR appointment:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -265,7 +265,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error fetching FHIR appointment:', error.response?.data || error.message);
+            console.error('Error fetching FHIR appointment:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -286,7 +286,7 @@ class FHIRService {
                 entries: response.data.entry || []
             };
         } catch (error) {
-            console.error('❌ Error searching FHIR appointments:', error.response?.data || error.message);
+            console.error('Error searching FHIR appointments:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -344,7 +344,7 @@ class FHIRService {
             const fhirPractitioner = this.convertToFHIRPractitioner(mongoDoctor);
             const response = await this.axios.post('/Practitioner', fhirPractitioner);
             
-            console.log('✅ Practitioner created in FHIR server:', response.data.id);
+            console.log('Practitioner created in FHIR server:', response.data.id);
             
             return {
                 success: true,
@@ -352,7 +352,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error creating FHIR practitioner:', error.response?.data || error.message);
+            console.error('Error creating FHIR practitioner:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -371,7 +371,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error fetching FHIR practitioner:', error.response?.data || error.message);
+            console.error('Error fetching FHIR practitioner:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -392,7 +392,7 @@ class FHIRService {
                 entries: response.data.entry || []
             };
         } catch (error) {
-            console.error('❌ Error searching FHIR practitioners:', error.response?.data || error.message);
+            console.error('Error searching FHIR practitioners:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -410,14 +410,14 @@ class FHIRService {
             
             const response = await this.axios.put(`/Practitioner/${fhirId}`, fhirPractitioner);
             
-            console.log('✅ Practitioner updated in FHIR server:', fhirId);
+            console.log('Practitioner updated in FHIR server:', fhirId);
             
             return {
                 success: true,
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error updating FHIR practitioner:', error.response?.data || error.message);
+            console.error('Error updating FHIR practitioner:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -485,7 +485,7 @@ class FHIRService {
             
             const response = await this.axios.post('/MedicationRequest', fhirMedicationRequest);
             
-            console.log('✅ MedicationRequest created in FHIR server:', response.data.id);
+            console.log('MedicationRequest created in FHIR server:', response.data.id);
             
             return {
                 success: true,
@@ -493,7 +493,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error creating FHIR MedicationRequest:', error.response?.data || error.message);
+            console.error('Error creating FHIR MedicationRequest:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -515,14 +515,14 @@ class FHIRService {
             
             const response = await this.axios.put(`/MedicationRequest/${fhirId}`, fhirMedicationRequest);
             
-            console.log('✅ MedicationRequest updated in FHIR server:', fhirId);
+            console.log('MedicationRequest updated in FHIR server:', fhirId);
             
             return {
                 success: true,
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error updating FHIR MedicationRequest:', error.response?.data || error.message);
+            console.error('Error updating FHIR MedicationRequest:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -541,7 +541,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error fetching FHIR MedicationRequest:', error.response?.data || error.message);
+            console.error('Error fetching FHIR MedicationRequest:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -562,7 +562,7 @@ class FHIRService {
                 entries: response.data.entry || []
             };
         } catch (error) {
-            console.error('❌ Error searching FHIR MedicationRequests:', error.response?.data || error.message);
+            console.error('Error searching FHIR MedicationRequests:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -642,7 +642,7 @@ class FHIRService {
             const fhirOrganization = this.convertToFHIROrganization(mongoHospital);
             const response = await this.axios.post('/Organization', fhirOrganization);
             
-            console.log('✅ Organization created in FHIR server:', response.data.id);
+            console.log('Organization created in FHIR server:', response.data.id);
             
             return {
                 success: true,
@@ -650,7 +650,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error creating FHIR organization:', error.response?.data || error.message);
+            console.error('Error creating FHIR organization:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -668,14 +668,14 @@ class FHIRService {
             
             const response = await this.axios.put(`/Organization/${fhirId}`, fhirOrganization);
             
-            console.log('✅ Organization updated in FHIR server:', fhirId);
+            console.log('Organization updated in FHIR server:', fhirId);
             
             return {
                 success: true,
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error updating FHIR organization:', error.response?.data || error.message);
+            console.error('Error updating FHIR organization:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -694,7 +694,7 @@ class FHIRService {
                 data: response.data
             };
         } catch (error) {
-            console.error('❌ Error fetching FHIR organization:', error.response?.data || error.message);
+            console.error('Error fetching FHIR organization:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message
@@ -715,7 +715,7 @@ class FHIRService {
                 entries: response.data.entry || []
             };
         } catch (error) {
-            console.error('❌ Error searching FHIR organizations:', error.response?.data || error.message);
+            console.error('Error searching FHIR organizations:', error.response?.data || error.message);
             return {
                 success: false,
                 error: error.response?.data || error.message

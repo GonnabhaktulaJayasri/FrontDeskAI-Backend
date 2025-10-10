@@ -786,10 +786,10 @@ export const inboundCall = async (req, res) => {
         const callSid = req.body.CallSid;
         const to = req.body.To;
 
-        console.log(`📞 Inbound call from ${callerId} to ${to}`);
+        console.log(`Inbound call from ${callerId} to ${to}`);
 
         // ==================== STEP 1: CHECK FHIR FIRST ====================
-        console.log('🔍 Checking FHIR/EMR for patient...');
+        console.log('Checking FHIR/EMR for patient...');
         const fhirResult = await fhirSearchService.findOrImportPatientByPhone(callerId);
 
         let patient;
@@ -798,18 +798,18 @@ export const inboundCall = async (req, res) => {
         if (fhirResult.success) {
             patient = fhirResult.patient;
             patientSource = fhirResult.source;
-            console.log(`✅ Patient found via ${patientSource}: ${patient._id}`);
+            console.log(`Patient found via ${patientSource}: ${patient._id}`);
         } else {
             // ==================== STEP 2: NOT IN FHIR, CHECK MONGODB ====================
-            console.log('📭 Patient not in FHIR, checking MongoDB...');
+            console.log('Patient not in FHIR, checking MongoDB...');
             patient = await Patient.findOne({ phone: callerId });
 
             if (patient) {
                 patientSource = 'mongodb_only';
-                console.log(`✅ Patient found in MongoDB (not in FHIR): ${patient._id}`);
+                console.log(`Patient found in MongoDB (not in FHIR): ${patient._id}`);
             } else {
                 // ==================== STEP 3: CREATE NEW PATIENT ====================
-                console.log('➕ Creating new patient...');
+                console.log('Creating new patient...');
                 patient = new Patient({
                     phone: callerId,
                     firstName: 'New', // Placeholder - AI will collect name
@@ -817,16 +817,16 @@ export const inboundCall = async (req, res) => {
                 });
                 await patient.save();
                 patientSource = 'new';
-                console.log(`✅ New patient created: ${patient._id}`);
+                console.log(`New patient created: ${patient._id}`);
             }
         }
 
         // ==================== FIND HOSPITAL ====================
         let hospital = await Hospital.findOne({ twilioPhoneNumber: to });
         if (!hospital) {
-            console.warn(`⚠️  No hospital found for Twilio number: ${to}`);
+            console.warn(`No hospital found for Twilio number: ${to}`);
         } else {
-            console.log(`🏥 Hospital: ${hospital.name}`);
+            console.log(`Hospital: ${hospital.name}`);
         }
 
         // ==================== CREATE CALL RECORD ====================
@@ -887,11 +887,11 @@ export const inboundCall = async (req, res) => {
         global.callContextMap.set(callSid, context);
         global.callContextMap.set(contextKey, context);
 
-        console.log(`🔗 Call context stored with key: ${contextKey}`);
-        console.log(`📊 Patient source: ${patientSource}`);
+        console.log(`Call context stored with key: ${contextKey}`);
+        console.log(`Patient source: ${patientSource}`);
 
         // ==================== TELL TWILIO TO STREAM AUDIO ====================
-        console.log('🎙️  Setting up Twilio stream...');
+        console.log('Setting up Twilio stream...');
         const twiml = new VoiceResponse();
         twiml.connect().stream({
             url: `${process.env.BASE_URL.replace(/^https?:\/\//, "wss://")}/api/calls/stream?contextKey=${contextKey}`
@@ -901,7 +901,7 @@ export const inboundCall = async (req, res) => {
         res.send(twiml.toString());
 
     } catch (err) {
-        console.error("❌ Inbound call error:", err);
+        console.error("Inbound call error:", err);
         res.status(500).send("Error handling inbound call");
     }
 };
@@ -911,10 +911,10 @@ export const inboundCall = async (req, res) => {
 //         const callSid = req.body.CallSid;
 //         const to = req.body.To;
 
-//         console.log(`📞 Inbound call from ${callerId} to ${to}`);
+//         console.log(`Inbound call from ${callerId} to ${to}`);
 
 //         // ==================== STEP 1: CHECK FHIR/EMR ONLY ====================
-//         console.log('🔍 Checking FHIR/EMR for patient (EMR as single source of truth)...');
+//         console.log('Checking FHIR/EMR for patient (EMR as single source of truth)...');
 //         const fhirResult = await fhirSearchService.findOrImportPatientByPhone(callerId);
 
 //         let patient;
@@ -924,12 +924,12 @@ export const inboundCall = async (req, res) => {
 //             // Patient found in FHIR - imported to MongoDB
 //             patient = fhirResult.patient;
 //             patientSource = fhirResult.source; // 'fhir' or 'mongodb' if already imported
-//             console.log(`✅ Patient found in EMR (source: ${patientSource}): ${patient._id}`);
+//             console.log(`Patient found in EMR (source: ${patientSource}): ${patient._id}`);
 //             console.log(`   FHIR ID: ${patient.fhirId}`);
 //         } else {
 //             // ==================== STEP 2: NOT IN FHIR - CREATE NEW ====================
-//             console.log('📭 Patient not in FHIR/EMR');
-//             console.log('➕ Creating new patient (will sync to FHIR)...');
+//             console.log('Patient not in FHIR/EMR');
+//             console.log('Creating new patient (will sync to FHIR)...');
             
 //             patient = new Patient({
 //                 phone: callerId,
@@ -940,16 +940,16 @@ export const inboundCall = async (req, res) => {
 //             await patient.save(); // Auto-syncs to FHIR via post-save hook
 //             patientSource = 'new_created';
             
-//             console.log(`✅ New patient created: ${patient._id}`);
-//             console.log(`✅ Auto-synced to FHIR: ${patient.fhirId || 'syncing...'}`);
+//             console.log(`New patient created: ${patient._id}`);
+//             console.log(`Auto-synced to FHIR: ${patient.fhirId || 'syncing...'}`);
 //         }
 
 //         // ==================== FIND HOSPITAL ====================
 //         let hospital = await Hospital.findOne({ twilioPhoneNumber: to });
 //         if (!hospital) {
-//             console.warn(`⚠️  No hospital found for Twilio number: ${to}`);
+//             console.warn(`No hospital found for Twilio number: ${to}`);
 //         } else {
-//             console.log(`🏥 Hospital: ${hospital.name}`);
+//             console.log(`Hospital: ${hospital.name}`);
 //         }
 
 //         // ==================== CREATE CALL RECORD ====================
@@ -1011,12 +1011,12 @@ export const inboundCall = async (req, res) => {
 //         global.callContextMap.set(callSid, context);
 //         global.callContextMap.set(contextKey, context);
 
-//         console.log(`🔗 Call context stored`);
-//         console.log(`📊 Patient source: ${patientSource}`);
-//         console.log(`🆔 FHIR ID: ${patient.fhirId || 'pending sync'}`);
+//         console.log(`Call context stored`);
+//         console.log(`Patient source: ${patientSource}`);
+//         console.log(`FHIR ID: ${patient.fhirId || 'pending sync'}`);
 
 //         // ==================== TELL TWILIO TO STREAM AUDIO ====================
-//         console.log('🎙️  Setting up Twilio stream...');
+//         console.log('Setting up Twilio stream...');
 //         const twiml = new VoiceResponse();
 //         twiml.connect().stream({
 //             url: `${process.env.BASE_URL.replace(/^https?:\/\//, "wss://")}/api/calls/stream?contextKey=${contextKey}`
@@ -1026,7 +1026,7 @@ export const inboundCall = async (req, res) => {
 //         res.send(twiml.toString());
 
 //     } catch (err) {
-//         console.error("❌ Inbound call error:", err);
+//         console.error("Inbound call error:", err);
 //         res.status(500).send("Error handling inbound call");
 //     }
 // };
