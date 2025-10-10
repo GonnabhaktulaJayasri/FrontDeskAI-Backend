@@ -2671,7 +2671,7 @@ export async function callAssistant(connection, req) {
                     setTimeout(() => {
                         console.log('Timeout reached, ending call');
                         endCallSafely();
-                    }, 8000);
+                    }, 5000);
                     return;
 
                 case 'get_my_appointments':
