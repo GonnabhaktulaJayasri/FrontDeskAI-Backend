@@ -437,6 +437,7 @@
 
 import Appointment from "../models/Appointment.js";
 import Doctor from "../models/Doctor.js";
+import Hospital from "../models/Hospital.js";
 import Patient from "../models/Patient.js";
 
 /**
@@ -451,7 +452,8 @@ export const bookAppointment = async ({
     doctor_name,
     date,
     time,
-    reason
+    reason,
+    hospitalContext
 }) => {
     try {
         // Step 1: Find or create patient (auto-syncs to FHIR)
@@ -465,7 +467,7 @@ export const bookAppointment = async ({
                 age: patient_age
             });
             await patient.save(); // Auto-syncs to FHIR via post-save hook
-            console.log(`✅ New patient created and synced to FHIR: ${patient.fhirId}`);
+            console.log(`New patient created and synced to FHIR: ${patient.fhirId}`);
         }
 
         // Step 2: Find doctor
@@ -478,7 +480,19 @@ export const bookAppointment = async ({
         if (!doctor.fhirId) {
             console.log('🔄 Doctor not in FHIR, syncing now...');
             await doctor.syncToFHIR();
-            console.log(`✅ Doctor synced to FHIR: ${doctor.fhirId}`);
+            console.log(`Doctor synced to FHIR: ${doctor.fhirId}`);
+        }
+
+        const hospital = await Hospital.findById(hospitalContext.hospitalId);
+        if (!hospital) {
+            return { success: false, message: "Hospital context not found" };
+        }
+
+        // Ensure hospital is synced to FHIR
+        if (!hospital.fhirId) {
+            console.log('🔄 Hospital not in FHIR, syncing now...');
+            await hospital.syncToFHIR();
+            console.log(`Hospital synced to FHIR: ${hospital.fhirId}`);
         }
 
         // Step 3: Build appointment Date object
@@ -488,6 +502,7 @@ export const bookAppointment = async ({
         const appointment = new Appointment({
             patient: patient._id,
             doctor: doctor._id,
+            hospital: hospital._id,
             dateTime,
             reason,
             status: 'scheduled'
@@ -496,9 +511,9 @@ export const bookAppointment = async ({
         await appointment.save(); // Auto-syncs to FHIR via post-save hook
 
         // Reload to get FHIR IDs
-        await appointment.populate(['patient', 'doctor']);
+        await appointment.populate(['patient', 'doctor', 'hospital']);
 
-        console.log(`✅ Appointment created and synced to FHIR: ${appointment.fhirId}`);
+        console.log(`Appointment created and synced to FHIR: ${appointment.fhirId}`);
 
         return {
             success: true,
@@ -569,7 +584,7 @@ export const rescheduleAppointmentByDetails = async (rescheduleData) => {
 
         await appointment.save(); // Auto-syncs update to FHIR
 
-        console.log(`✅ Appointment rescheduled and synced to FHIR: ${appointment.fhirId}`);
+        console.log(`Appointment rescheduled and synced to FHIR: ${appointment.fhirId}`);
 
         return {
             success: true,
@@ -628,7 +643,7 @@ export const cancelAppointmentByDetails = async (cancelData) => {
         appointment.status = 'cancelled';
         await appointment.save(); // Auto-syncs update to FHIR
 
-        console.log(`✅ Appointment cancelled and synced to FHIR: ${appointment.fhirId}`);
+        console.log(`Appointment cancelled and synced to FHIR: ${appointment.fhirId}`);
 
         return {
             success: true,

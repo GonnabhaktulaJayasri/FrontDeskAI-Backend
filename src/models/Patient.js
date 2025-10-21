@@ -171,7 +171,7 @@ import fhirService from "../services/fhirService.js";
 
 const patientSchema = new mongoose.Schema({
     firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
+    lastName: { type: String, },
     phone: { type: String, required: true, unique: true },
     email: { type: String },
     dob: { type: Date },

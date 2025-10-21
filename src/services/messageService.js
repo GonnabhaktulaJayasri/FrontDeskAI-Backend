@@ -3317,8 +3317,11 @@ Remember: Track the conversation flow to know whether to book or reschedule!`;
 
             let message = '';
 
-            if (conversationType === 'appointment_reminder' || conversationType === '24_hour' || conversationType === '1_hour') {
-                const timeUntil = conversationType === '1_hour' ? 'in 1 hour' : 'tomorrow';
+            if (['appointment_reminder', '24_hour', '1_hour'].includes(conversationType)) {
+                let timeUntil = 'soon';
+                if (conversationType === '1_hour') timeUntil = 'in 1 hour';
+                else if (conversationType === '24_hour' || conversationType === 'appointment_reminder') timeUntil = 'tomorrow';
+                
                 const date = appointment.dateTime.toLocaleDateString('en-US', {
                     weekday: 'long',
                     month: 'long',

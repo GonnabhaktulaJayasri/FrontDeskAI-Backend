@@ -3,7 +3,8 @@ import express from 'express';
 import {
     initializeChat,
     sendMessage,
-    getConversationHistory
+    getConversationHistory,
+    updateConversationCallStatus
 } from '../controllers/chatbotController.js';
 
 const router = express.Router();
@@ -16,5 +17,7 @@ router.post('/message', sendMessage);
 
 // Get conversation history
 router.get('/conversation/:sessionId', getConversationHistory);
+
+router.post('/call-status-webhook', updateConversationCallStatus);
 
 export default router;

@@ -2698,6 +2698,10 @@ export async function callAssistant(connection, req) {
                 case 'book_appointment':
                     detectedIntent = 'book_appointment';
 
+                    const hospitalContext = {
+                        hospitalId: callContext?.hospital?._id || callContext?.hospital?.id || process.env.DEFAULT_HOSPITAL_ID
+                    };
+
                     // Use stored patient data for returning patients
                     const appointmentData = {
                         patient_firstname: args.patient_firstname || patientData?.firstName,
@@ -2708,7 +2712,8 @@ export async function callAssistant(connection, req) {
                         doctor_name: args.doctor_name,
                         date: args.date,
                         time: args.time,
-                        reason: args.reason
+                        reason: args.reason,
+                        hospitalContext
                     };
 
                     extractedEntities = { ...extractedEntities, ...appointmentData };

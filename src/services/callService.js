@@ -336,7 +336,8 @@ class CallService {
             reminderData,
             followUpData,
             patientId,
-            hospitalId
+            hospitalId,
+            metadata
         } = options;
 
         try {
@@ -388,6 +389,14 @@ class CallService {
                 }
             }
 
+            const callMetadata = {
+                callType: callType,
+                originalPhoneInput: phoneNumber,
+                appointmentId: appointmentId,
+                reminderType: reminderType,
+                ...(metadata || {})  // ✅ Merge additional metadata if provided
+            };
+
             // Create call record BEFORE making the call
             const callRecord = new Call({
                 type: "outbound",
@@ -397,12 +406,7 @@ class CallService {
                 patient: patient._id,
                 reason: reason || "Outbound call",
                 hospitalId: hospital._id,
-                metadata: {
-                    callType: callType,
-                    originalPhoneInput: phoneNumber,
-                    appointmentId: appointmentId,
-                    reminderType: reminderType
-                }
+                metadata: callMetadata
             });
             await callRecord.save();
 
@@ -439,6 +443,7 @@ class CallService {
                 reminderData: reminderData,
                 followUpData: followUpData,
                 hospital: hospitalData,
+                metadata: metadata || {},
                 timestamp: Date.now()
             };
 
@@ -460,10 +465,13 @@ class CallService {
                 callSid: call.sid,
                 status: call.status,
                 metadata: {
-                    ...callRecord.metadata,
-                    contextKey: contextKey
-                }
-            });
+                    ...(callRecord.metadata || {}),
+                    contextKey: contextKey,
+                    twilioCallSid: call.sid
+                },
+            },
+                { new: true }
+            );
 
             // Update context with actual Twilio SID
             const context = global.callContextMap.get(contextKey);
