@@ -1,269 +1,292 @@
 /**
- * Phone number normalization and formatting utilities
- * Handles international phone numbers with or without country codes
+ * Phone number utility functions
+ * Handles multiple country codes (+91 for India, +1 for US/Canada)
  */
 
 /**
- * Default country code to use when none is provided
- * Can be configured via environment variable
- */
-const DEFAULT_COUNTRY_CODE = process.env.DEFAULT_COUNTRY_CODE || '+91'; // US by default
-
-/**
- * Common country codes
- */
-export const COUNTRY_CODES = {
-    US: '+1',
-    CA: '+1',
-    IN: '+91',
-    UK: '+44',
-    AU: '+61',
-    // Add more as needed
-};
-
-/**
- * Clean phone number - remove all non-digit characters except leading +
- * @param {string} phone - Raw phone number
- * @returns {string} - Cleaned phone number
- */
-export function cleanPhoneNumber(phone) {
-    if (!phone) return '';
-    
-    // Convert to string and trim
-    phone = String(phone).trim();
-    
-    // If starts with +, preserve it and remove all other non-digits
-    if (phone.startsWith('+')) {
-        return '+' + phone.substring(1).replace(/\D/g, '');
-    }
-    
-    // Remove all non-digits
-    return phone.replace(/\D/g, '');
-}
-
-/**
- * Normalize phone number to E.164 format with country code
- * @param {string} phone - Phone number (with or without country code)
- * @param {string} defaultCountryCode - Default country code to use (e.g., '+1', '+91')
- * @returns {string} - Normalized phone number with country code
- */
-export function normalizePhoneNumber(phone, defaultCountryCode = DEFAULT_COUNTRY_CODE) {
-    if (!phone) return '';
-    
-    const cleaned = cleanPhoneNumber(phone);
-    
-    // Already has a country code
-    if (cleaned.startsWith('+')) {
-        return cleaned;
-    }
-    
-    // Add default country code
-    return defaultCountryCode + cleaned;
-}
-
-/**
- * Generate all possible phone number formats for searching
- * This is useful when searching databases where the format might be inconsistent
+ * Normalize phone number to E.164 format
+ * Supports both Indian (+91) and US/Canada (+1) numbers
  * 
- * @param {string} phone - Phone number (with or without country code)
- * @param {string[]} countryCodes - Array of country codes to try (e.g., ['+1', '+91'])
- * @returns {string[]} - Array of possible phone number formats
+ * @param {string} phone - Raw phone number
+ * @returns {string} - Normalized phone in E.164 format (e.g., +918884180740 or +15551234567)
  */
-export function generatePhoneVariations(phone, countryCodes = ['+1', '+91']) {
-    if (!phone) return [];
-    
-    const cleaned = cleanPhoneNumber(phone);
-    const variations = new Set();
-    
-    // If already has country code, add as-is
-    if (cleaned.startsWith('+')) {
-        variations.add(cleaned);
-        // Also add without + for some systems
-        variations.add(cleaned.substring(1));
-        // Also add just the number without country code
-        const withoutCode = cleaned.substring(1);
-        // Try to extract the local number (assuming country code is 1-3 digits)
-        for (let i = 1; i <= 3; i++) {
-            if (withoutCode.length > i) {
-                variations.add(withoutCode.substring(i));
-            }
-        }
-    } else {
-        // Add the raw cleaned number
-        variations.add(cleaned);
-        
-        // Add with each country code
-        countryCodes.forEach(code => {
-            variations.add(code + cleaned);
-            variations.add(code.substring(1) + cleaned); // Without +
-        });
+export function normalizePhoneNumber(phone) {
+    if (!phone) return '';
+
+    // Remove all non-digit characters
+    let cleaned = phone.replace(/\D/g, '');
+
+    // Already has country code
+    if (phone.startsWith('+')) {
+        return phone.replace(/\D/g, '').replace(/^/, '+');
     }
-    
-    // Filter out empty strings and return unique values
-    return Array.from(variations).filter(v => v && v.length > 0);
+
+    // Determine country code based on length and pattern
+    if (cleaned.length === 10) {
+        // Could be US/Canada or Indian number without country code
+        // Default to +91 (India) if starts with 6-9, otherwise +1 (US)
+        const firstDigit = cleaned[0];
+        if (firstDigit >= '6' && firstDigit <= '9') {
+            return '+91' + cleaned;
+        } else {
+            return '+1' + cleaned;
+        }
+    } else if (cleaned.length === 11) {
+        // Likely US number with leading 1
+        if (cleaned.startsWith('1')) {
+            return '+' + cleaned;
+        }
+        // Or Indian number starting with 91
+        if (cleaned.startsWith('91')) {
+            return '+' + cleaned;
+        }
+    } else if (cleaned.length === 12) {
+        // Likely has country code already
+        if (cleaned.startsWith('91')) {
+            return '+' + cleaned;
+        }
+        if (cleaned.startsWith('1')) {
+            return '+' + cleaned;
+        }
+    }
+
+    // Default: add +91 (India) for numbers that look Indian
+    if (cleaned.length === 10 && cleaned[0] >= '6') {
+        return '+91' + cleaned;
+    }
+
+    // Default: add +1 (US) for other 10-digit numbers
+    if (cleaned.length === 10) {
+        return '+1' + cleaned;
+    }
+
+    // Fallback: return with + prefix
+    return '+' + cleaned;
 }
 
 /**
- * Smart phone number matching
- * Tries to match phone numbers even if formats differ
+ * Generate all possible phone number variations for searching
+ * Now includes +1 variations for US/Canada numbers
+ * 
+ * Example for +918884180740:
+ * Returns: ['+918884180740', '918884180740', '8884180740', '+15551234567', '15551234567', '5551234567', ...]
+ * 
+ * @param {string} phone - Phone number in any format
+ * @returns {string[]} - Array of phone number variations
+ */
+export function generatePhoneVariations(phone) {
+    if (!phone) return [];
+
+    // Clean the number
+    const cleaned = phone.replace(/\D/g, '');
+    const variations = new Set();
+
+    // Add original cleaned number
+    variations.add(cleaned);
+
+    // ==================== INDIAN NUMBER VARIATIONS (+91) ====================
+    
+    // Full format with +91
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+        variations.add('+' + cleaned); // +918884180740
+        variations.add(cleaned.substring(2)); // 8884180740 (remove 91)
+    } else if (cleaned.length === 10) {
+        // 10 digit number - could be Indian
+        variations.add('+91' + cleaned); // +918884180740
+        variations.add('91' + cleaned); // 918884180740
+    }
+
+    // Without country code
+    if (cleaned.startsWith('91') && cleaned.length >= 10) {
+        variations.add(cleaned.substring(2)); // 8884180740
+    }
+
+    // Different prefix lengths for Indian numbers
+    if (cleaned.length >= 10) {
+        const last10 = cleaned.slice(-10);
+        variations.add(last10); // 8884180740
+        variations.add('+91' + last10); // +918884180740
+        variations.add('91' + last10); // 918884180740
+        
+        // Shorter variations (sometimes stored without leading digits)
+        if (last10.startsWith('0')) {
+            variations.add(last10.substring(1)); // 884180740 (9 digits)
+        }
+        
+        // Even shorter (sometimes area codes removed)
+        const last9 = last10.substring(1);
+        variations.add(last9); // 884180740
+        
+        const last8 = last9.substring(1);
+        variations.add(last8); // 84180740
+    }
+
+    // ==================== US/CANADA NUMBER VARIATIONS (+1) ====================
+    
+    // Full format with +1
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+        variations.add('+' + cleaned); // +15551234567
+        variations.add(cleaned.substring(1)); // 5551234567 (remove 1)
+    } else if (cleaned.length === 10 && !cleaned.startsWith('91')) {
+        // 10 digit number - could be US/Canada
+        variations.add('+1' + cleaned); // +15551234567
+        variations.add('1' + cleaned); // 15551234567
+    }
+
+    // Without country code
+    if (cleaned.startsWith('1') && cleaned.length === 11) {
+        variations.add(cleaned.substring(1)); // 5551234567
+    }
+
+    // Different prefix lengths for US/Canada numbers
+    if (cleaned.length >= 10 && !cleaned.startsWith('91')) {
+        const last10 = cleaned.slice(-10);
+        variations.add(last10); // 5551234567
+        variations.add('+1' + last10); // +15551234567
+        variations.add('1' + last10); // 15551234567
+    }
+
+    // ==================== INTERNATIONAL FORMAT VARIATIONS ====================
+    
+    // If original had + prefix, add with and without
+    if (phone.startsWith('+')) {
+        variations.add(phone);
+        variations.add(phone.substring(1));
+    } else {
+        variations.add('+' + cleaned);
+    }
+
+    // Return as sorted array (shortest to longest for efficient searching)
+    return Array.from(variations).sort((a, b) => a.length - b.length);
+}
+
+/**
+ * Validate phone number format
+ * Supports both Indian and US/Canada numbers
+ * 
+ * @param {string} phone - Phone number to validate
+ * @returns {boolean} - True if valid
+ */
+export function isValidPhoneNumber(phone) {
+    if (!phone) return false;
+
+    const cleaned = phone.replace(/\D/g, '');
+
+    // Indian number patterns
+    const indianPatterns = [
+        /^\+?91[6-9]\d{9}$/, // +91XXXXXXXXXX (starts with 6-9)
+        /^[6-9]\d{9}$/ // XXXXXXXXXX (10 digits starting with 6-9)
+    ];
+
+    // US/Canada number patterns
+    const usPatterns = [
+        /^\+?1[2-9]\d{9}$/, // +1XXXXXXXXXX
+        /^[2-9]\d{9}$/ // XXXXXXXXXX (10 digits starting with 2-9)
+    ];
+
+    // Check against all patterns
+    const allPatterns = [...indianPatterns, ...usPatterns];
+    
+    return allPatterns.some(pattern => {
+        // Test against original format
+        if (pattern.test(phone)) return true;
+        // Test against cleaned format
+        if (pattern.test(cleaned)) return true;
+        // Test against cleaned with +
+        if (pattern.test('+' + cleaned)) return true;
+        return false;
+    });
+}
+
+/**
+ * Format phone number for display
+ * 
+ * @param {string} phone - Phone number
+ * @param {string} style - Display style: 'international', 'national', 'compact'
+ * @returns {string} - Formatted phone number
+ */
+export function formatPhoneNumber(phone, style = 'international') {
+    if (!phone) return '';
+
+    const normalized = normalizePhoneNumber(phone);
+    const cleaned = normalized.replace(/\D/g, '');
+
+    if (style === 'international') {
+        // +91 888-418-0740 or +1 (555) 123-4567
+        if (cleaned.startsWith('91') && cleaned.length === 12) {
+            return `+91 ${cleaned.substring(2, 5)}-${cleaned.substring(5, 8)}-${cleaned.substring(8)}`;
+        } else if (cleaned.startsWith('1') && cleaned.length === 11) {
+            return `+1 (${cleaned.substring(1, 4)}) ${cleaned.substring(4, 7)}-${cleaned.substring(7)}`;
+        }
+    } else if (style === 'national') {
+        // (888) 418-0740 or (555) 123-4567
+        if (cleaned.startsWith('91') && cleaned.length === 12) {
+            return `${cleaned.substring(2, 5)}-${cleaned.substring(5, 8)}-${cleaned.substring(8)}`;
+        } else if (cleaned.startsWith('1') && cleaned.length === 11) {
+            return `(${cleaned.substring(1, 4)}) ${cleaned.substring(4, 7)}-${cleaned.substring(7)}`;
+        }
+    } else if (style === 'compact') {
+        // Just return normalized
+        return normalized;
+    }
+
+    return normalized;
+}
+
+/**
+ * Detect country from phone number
+ * 
+ * @param {string} phone - Phone number
+ * @returns {string} - Country code ('IN', 'US', 'CA', or 'UNKNOWN')
+ */
+export function detectCountry(phone) {
+    if (!phone) return 'UNKNOWN';
+
+    const normalized = normalizePhoneNumber(phone);
+    
+    if (normalized.startsWith('+91')) {
+        return 'IN'; // India
+    } else if (normalized.startsWith('+1')) {
+        // Could be US or Canada - both use +1
+        return 'US'; // Default to US (can't distinguish without area code lookup)
+    }
+
+    return 'UNKNOWN';
+}
+
+/**
+ * Compare two phone numbers for equality
+ * Handles different formats
  * 
  * @param {string} phone1 - First phone number
  * @param {string} phone2 - Second phone number
- * @returns {boolean} - True if numbers match
+ * @returns {boolean} - True if numbers are the same
  */
-export function phonesMatch(phone1, phone2) {
+export function arePhoneNumbersEqual(phone1, phone2) {
     if (!phone1 || !phone2) return false;
-    
-    const clean1 = cleanPhoneNumber(phone1);
-    const clean2 = cleanPhoneNumber(phone2);
-    
-    // Direct match
-    if (clean1 === clean2) return true;
-    
-    // Try matching without country codes
-    const variations1 = generatePhoneVariations(clean1);
-    const variations2 = generatePhoneVariations(clean2);
-    
-    // Check if any variation matches
-    return variations1.some(v1 => variations2.includes(v1));
-}
 
-/**
- * Format phone number for display (human-readable)
- * @param {string} phone - Phone number
- * @param {string} format - Format type ('us', 'international', 'raw')
- * @returns {string} - Formatted phone number
- */
-export function formatPhoneForDisplay(phone, format = 'international') {
-    if (!phone) return '';
-    
-    const cleaned = cleanPhoneNumber(phone);
-    
-    if (format === 'raw') {
-        return cleaned;
-    }
-    
-    // US format: (555) 123-4567
-    if (format === 'us') {
-        const match = cleaned.match(/^(\+?1)?(\d{3})(\d{3})(\d{4})$/);
-        if (match) {
-            return `(${match[2]}) ${match[3]}-${match[4]}`;
-        }
-    }
-    
-    // International format: +1 555 123 4567
-    if (format === 'international') {
-        if (cleaned.startsWith('+1')) {
-            const number = cleaned.substring(2);
-            if (number.length === 10) {
-                return `+1 ${number.substring(0, 3)} ${number.substring(3, 6)} ${number.substring(6)}`;
-            }
-        } else if (cleaned.startsWith('+91')) {
-            const number = cleaned.substring(3);
-            return `+91 ${number}`;
-        }
-    }
-    
-    // Default: return as-is
-    return cleaned;
-}
+    const normalized1 = normalizePhoneNumber(phone1);
+    const normalized2 = normalizePhoneNumber(phone2);
 
-/**
- * Validate phone number
- * @param {string} phone - Phone number to validate
- * @param {string} countryCode - Expected country code (optional)
- * @returns {boolean} - True if valid
- */
-export function isValidPhoneNumber(phone, countryCode = null) {
-    if (!phone) return false;
-    
-    const cleaned = cleanPhoneNumber(phone);
-    
-    // Must have at least 10 digits (typical minimum)
-    if (cleaned.replace(/\D/g, '').length < 10) {
-        return false;
-    }
-    
-    // If country code specified, check it matches
-    if (countryCode && !cleaned.startsWith(countryCode)) {
-        return false;
-    }
-    
-    return true;
-}
+    // Direct comparison
+    if (normalized1 === normalized2) return true;
 
-/**
- * Extract country code from phone number
- * @param {string} phone - Phone number
- * @returns {string|null} - Country code or null
- */
-export function extractCountryCode(phone) {
-    if (!phone) return null;
-    
-    const cleaned = cleanPhoneNumber(phone);
-    
-    if (!cleaned.startsWith('+')) {
-        return null;
-    }
-    
-    // Try common country code lengths (1-3 digits)
-    for (let len = 1; len <= 3; len++) {
-        const code = cleaned.substring(0, len + 1); // +1 position + length
-        // Check if it's a known country code
-        if (Object.values(COUNTRY_CODES).includes(code)) {
-            return code;
-        }
-    }
-    
-    return null;
-}
+    // Generate variations and check for overlap
+    const variations1 = new Set(generatePhoneVariations(phone1));
+    const variations2 = new Set(generatePhoneVariations(phone2));
 
-/**
- * Detect likely country code based on phone number length and format
- * @param {string} phone - Phone number
- * @returns {string} - Detected or default country code
- */
-export function detectCountryCode(phone) {
-    if (!phone) return DEFAULT_COUNTRY_CODE;
-    
-    const cleaned = cleanPhoneNumber(phone);
-    
-    // Already has country code
-    if (cleaned.startsWith('+')) {
-        const extracted = extractCountryCode(cleaned);
-        return extracted || DEFAULT_COUNTRY_CODE;
+    for (const v1 of variations1) {
+        if (variations2.has(v1)) return true;
     }
-    
-    // Detect based on length
-    const digitCount = cleaned.length;
-    
-    // 10 digits typically means US/Canada
-    if (digitCount === 10) {
-        return '+1';
-    }
-    
-    // 11 digits starting with 1 means US/Canada with country code
-    if (digitCount === 11 && cleaned.startsWith('1')) {
-        return '+1';
-    }
-    
-    // 10 digits means India (mobile)
-    if (digitCount === 10 && cleaned.startsWith('6,7,8,9')) {
-        return '+91';
-    }
-    
-    // Default
-    return DEFAULT_COUNTRY_CODE;
+
+    return false;
 }
 
 export default {
-    cleanPhoneNumber,
     normalizePhoneNumber,
     generatePhoneVariations,
-    phonesMatch,
-    formatPhoneForDisplay,
     isValidPhoneNumber,
-    extractCountryCode,
-    detectCountryCode,
-    COUNTRY_CODES
+    formatPhoneNumber,
+    detectCountry,
+    arePhoneNumbersEqual
 };

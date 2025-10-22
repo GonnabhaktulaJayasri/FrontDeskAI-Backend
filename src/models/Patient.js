@@ -176,6 +176,7 @@ const patientSchema = new mongoose.Schema({
     email: { type: String },
     dob: { type: Date },
     age: { type: Number },
+    gender: { type: String, enum: ["male", "female", "other"] },
 
     // Last confirmed appointment
     lastAppointment: { type: Date },
