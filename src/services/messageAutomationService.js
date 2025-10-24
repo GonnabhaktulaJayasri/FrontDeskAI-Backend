@@ -118,7 +118,7 @@
 
 //                 // Determine communication method using NEW schema
 //                 const method = this.determineReminderMethod(appointment, reminderType);
-                
+
 //                 console.log(`Processing ${reminderType} reminder for appointment ${appointment._id} via ${method}`);
 
 //                 if (method === 'call') {
@@ -164,7 +164,7 @@
 //      */
 //     chooseCommincationMethod(patient) {
 //         const prefs = patient.communicationPreferences || {};
-        
+
 //         // Check patient's overall preference
 //         switch (prefs.preferredMethod) {
 //             case 'whatsapp':
@@ -282,9 +282,9 @@
 //     async checkAndSendFollowUps() {
 //         try {
 //             console.log('Checking for follow-up communications...');
-            
+
 //             const now = new Date();
-            
+
 //             // Find appointments needing follow-ups
 //             const appointments = await Appointment.find({
 //                 $or: [
@@ -304,47 +304,47 @@
 //                     }
 //                 ]
 //             }).populate('patient doctor');
-            
+
 //             console.log(`Found ${appointments.length} appointments needing follow-ups`);
-            
+
 //             for (const appointment of appointments) {
 //                 if (!appointment.patient?.phone) {
 //                     console.log(`Skipping follow-up for appointment ${appointment._id} - no patient phone`);
 //                     continue;
 //                 }
-                
+
 //                 // Auto-schedule if status is 'not_scheduled'
 //                 if (appointment.followUp.status === 'not_scheduled') {
 //                     const appointmentDate = new Date(appointment.dateTime);
 //                     const followUpDate = new Date(appointmentDate);
 //                     followUpDate.setDate(followUpDate.getDate() + 1); // CHANGED: 1 day after appointment (was 7)
-                    
+
 //                     // Update the appointment
 //                     appointment.followUp.status = 'scheduled';
 //                     appointment.followUp.scheduledDate = followUpDate;
 //                     appointment.followUp.attemptCount = 0;
 //                     await appointment.save();
-                    
+
 //                     console.log(`Auto-scheduled follow-up for appointment ${appointment._id} on ${followUpDate.toISOString()}`);
-                    
+
 //                     // Check if follow-up is due now
 //                     if (followUpDate > now) {
 //                         console.log(`Follow-up scheduled for future date, skipping for now`);
 //                         continue;
 //                     }
 //                 }
-                
+
 //                 // Determine communication method
 //                 const method = this.determineFollowUpMethod(appointment);
 //                 console.log(`Processing follow-up for appointment ${appointment._id} via ${method}`);
-                
+
 //                 // Send follow-up
 //                 if (method === 'call') {
 //                     await this.triggerFollowUpCall(appointment);
 //                 } else {
 //                     await this.triggerFollowUpMessage(appointment, method);
 //                 }
-                
+
 //                 // Update follow-up status after sending
 //                 await Appointment.findByIdAndUpdate(appointment._id, {
 //                     'followUp.status': 'sent',
@@ -352,11 +352,11 @@
 //                     'followUp.lastAttempt': new Date(),
 //                     $inc: { 'communicationSummary.totalFollowUps': 1 }
 //                 });
-                
+
 //                 // Brief delay between communications
 //                 await new Promise(resolve => setTimeout(resolve, 1000));
 //             }
-            
+
 //             console.log('Follow-up check completed');
 //         } catch (error) {
 //             console.error('Error checking follow-ups:', error);
@@ -501,10 +501,10 @@
 
 //             for (const appointment of escalationCandidates) {
 //                 console.log(`🔄 Escalating follow-up to call for appointment ${appointment._id}`);
-                
+
 //                 // Escalate to call using NEW schema
 //                 await appointment.escalateFollowUp('no_response');
-                
+
 //                 // Trigger the call
 //                 await this.triggerFollowUpCall(appointment);
 //             }
@@ -532,7 +532,7 @@
 //             } else {
 //                 const appointment = await Appointment.findById(appointmentId);
 //                 const currentAttemptCount = appointment.reminders?.[reminderType]?.attemptCount || 0;
-                
+
 //                 await Appointment.findByIdAndUpdate(appointmentId, {
 //                     $set: {
 //                         [`reminders.${reminderType}.status`]: 'sent',
@@ -856,7 +856,7 @@ class MessageAutomationService {
                     $gte: startTime,
                     $lte: endTime
                 },
-                status: { $in: ['scheduled', 'confirmed'] },
+                status: { $in: ['booked', 'scheduled', 'confirmed'] },
                 [`reminders.${reminderType}.enabled`]: true,
                 [`reminders.${reminderType}.status`]: 'not_sent',
                 [`reminders.${reminderType}.attemptCount`]: { $lt: this.maxRetries }
@@ -868,7 +868,7 @@ class MessageAutomationService {
                 try {
                     // ✅ STEP 1: Get fresh patient data from EMR/FHIR
                     console.log(`📡 Fetching patient from EMR for appointment ${appointment._id}`);
-                    
+
                     const patientResult = await fhirSearchService.findOrImportPatientByPhone(
                         appointment.patient.phone || appointment.patientPhone
                     );
@@ -879,7 +879,7 @@ class MessageAutomationService {
                     }
 
                     const emrPatient = patientResult.patient;
-                    
+
                     if (!emrPatient.phone) {
                         console.log(`Skipping appointment ${appointment._id} - no patient phone in EMR`);
                         continue;
@@ -889,7 +889,7 @@ class MessageAutomationService {
 
                     // ✅ STEP 2: Determine communication method using EMR patient preferences
                     const method = this.determineReminderMethod(appointment, reminderType, emrPatient);
-                    
+
                     console.log(`Processing ${reminderType} reminder for appointment ${appointment._id} via ${method}`);
 
                     // ✅ STEP 3: Send communication using EMR patient data
@@ -940,7 +940,7 @@ class MessageAutomationService {
      */
     chooseCommincationMethod(emrPatient) {
         const prefs = emrPatient.communicationPreferences || {};
-        
+
         switch (prefs.preferredMethod) {
             case 'whatsapp':
                 return prefs.allowWhatsApp && emrPatient.whatsappOptIn?.status ? 'whatsapp' : 'sms';
@@ -1046,9 +1046,9 @@ class MessageAutomationService {
     async checkAndSendFollowUps() {
         try {
             console.log('Checking for follow-up communications...');
-            
+
             const now = new Date();
-            
+
             // Find appointments needing follow-ups
             const appointments = await Appointment.find({
                 $or: [
@@ -1066,14 +1066,14 @@ class MessageAutomationService {
                     }
                 ]
             }).populate('doctor patient');
-            
+
             console.log(`Found ${appointments.length} appointments needing follow-ups`);
-            
+
             for (const appointment of appointments) {
                 try {
                     // ✅ Get fresh patient data from EMR
                     console.log(`📡 Fetching patient from EMR for follow-up ${appointment._id}`);
-                    
+
                     const patientResult = await fhirSearchService.findOrImportPatientByPhone(
                         appointment.patient.phone || appointment.patientPhone
                     );
@@ -1084,44 +1084,44 @@ class MessageAutomationService {
                     }
 
                     const emrPatient = patientResult.patient;
-                    
+
                     if (!emrPatient.phone) {
                         console.log(`Skipping follow-up for appointment ${appointment._id} - no phone in EMR`);
                         continue;
                     }
 
                     console.log(`✅ Using EMR data for patient ${emrPatient._id} (source: ${patientResult.source})`);
-                    
+
                     // Auto-schedule if status is 'not_scheduled'
                     if (appointment.followUp.status === 'not_scheduled') {
                         const appointmentDate = new Date(appointment.dateTime);
                         const followUpDate = new Date(appointmentDate);
                         followUpDate.setDate(followUpDate.getDate() + 1);
-                        
+
                         appointment.followUp.status = 'scheduled';
                         appointment.followUp.scheduledDate = followUpDate;
                         appointment.followUp.attemptCount = 0;
                         await appointment.save();
-                        
+
                         console.log(`Auto-scheduled follow-up for appointment ${appointment._id} on ${followUpDate.toISOString()}`);
-                        
+
                         if (followUpDate > now) {
                             console.log(`Follow-up scheduled for future date, skipping for now`);
                             continue;
                         }
                     }
-                    
+
                     // Determine communication method using EMR patient preferences
                     const method = this.determineFollowUpMethod(appointment, emrPatient);
                     console.log(`Processing follow-up for appointment ${appointment._id} via ${method}`);
-                    
+
                     // Send follow-up using EMR patient data
                     if (method === 'call') {
                         await this.triggerFollowUpCall(appointment, emrPatient);
                     } else {
                         await this.triggerFollowUpMessage(appointment, method, emrPatient);
                     }
-                    
+
                     // Update follow-up status after sending
                     await Appointment.findByIdAndUpdate(appointment._id, {
                         'followUp.status': 'sent',
@@ -1130,7 +1130,7 @@ class MessageAutomationService {
                         'followUp.emrPatientId': emrPatient.fhirId || emrPatient._id,
                         $inc: { 'communicationSummary.totalFollowUps': 1 }
                     });
-                    
+
                     await new Promise(resolve => setTimeout(resolve, 1000));
 
                 } catch (error) {
@@ -1138,7 +1138,7 @@ class MessageAutomationService {
                     continue;
                 }
             }
-            
+
             console.log('Follow-up check completed');
         } catch (error) {
             console.error('Error checking follow-ups:', error);
@@ -1255,7 +1255,7 @@ class MessageAutomationService {
                 'followUp.status': 'sent_message',
                 'followUp.method': { $in: ['sms', 'whatsapp'] },
                 'followUp.attemptCount': { $gte: 2 },
-                'followUp.sentAt': { 
+                'followUp.sentAt': {
                     $lte: new Date(Date.now() - (2 * 60 * 60 * 1000))
                 }
             });
@@ -1263,7 +1263,7 @@ class MessageAutomationService {
             for (const appointment of escalationCandidates) {
                 try {
                     console.log(`🔄 Escalating follow-up to call for appointment ${appointment._id}`);
-                    
+
                     // Get fresh EMR patient data for escalation
                     const patientResult = await fhirSearchService.findOrImportPatientByPhone(
                         appointment.patient.phone || appointment.patientPhone
@@ -1306,7 +1306,7 @@ class MessageAutomationService {
             } else {
                 const appointment = await Appointment.findById(appointmentId);
                 const currentAttemptCount = appointment.reminders?.[reminderType]?.attemptCount || 0;
-                
+
                 await Appointment.findByIdAndUpdate(appointmentId, {
                     $set: {
                         [`reminders.${reminderType}.status`]: 'sent',
@@ -1361,15 +1361,15 @@ class MessageAutomationService {
 
             const failedAppointments = await Appointment.find({
                 $or: [
-                    { 
+                    {
                         'reminders.24_hour.status': { $in: ['failed', 'no_answer'] },
                         'reminders.24_hour.attemptCount': { $lt: this.maxRetries }
                     },
-                    { 
+                    {
                         'reminders.1_hour.status': { $in: ['failed', 'no_answer'] },
                         'reminders.1_hour.attemptCount': { $lt: this.maxRetries }
                     },
-                    { 
+                    {
                         'followUp.status': { $in: ['failed', 'no_answer'] },
                         'followUp.attemptCount': { $lt: this.maxRetries }
                     }

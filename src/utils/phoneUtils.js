@@ -65,101 +65,52 @@ export function normalizePhoneNumber(phone) {
 }
 
 /**
- * Generate all possible phone number variations for searching
- * Now includes +1 variations for US/Canada numbers
- * 
- * Example for +918884180740:
- * Returns: ['+918884180740', '918884180740', '8884180740', '+15551234567', '15551234567', '5551234567', ...]
- * 
- * @param {string} phone - Phone number in any format
- * @returns {string[]} - Array of phone number variations
+ * Generate smart phone variations - prioritize international formats
+ * Only checks +91 (India) or +1 (US) based on number characteristics
  */
-export function generatePhoneVariations(phone) {
-    if (!phone) return [];
+export function generatePhoneVariations(phoneNumber) {
+    const variations = [];
 
-    // Clean the number
-    const cleaned = phone.replace(/\D/g, '');
-    const variations = new Set();
+    // Remove all non-digit characters except leading +
+    let cleaned = phoneNumber.trim();
+    const hasPlus = cleaned.startsWith('+');
+    cleaned = cleaned.replace(/[^\d]/g, '');
 
-    // Add original cleaned number
-    variations.add(cleaned);
-
-    // ==================== INDIAN NUMBER VARIATIONS (+91) ====================
-    
-    // Full format with +91
-    if (cleaned.length === 12 && cleaned.startsWith('91')) {
-        variations.add('+' + cleaned); // +918884180740
-        variations.add(cleaned.substring(2)); // 8884180740 (remove 91)
-    } else if (cleaned.length === 10) {
-        // 10 digit number - could be Indian
-        variations.add('+91' + cleaned); // +918884180740
-        variations.add('91' + cleaned); // 918884180740
+    // If already has country code, use as-is
+    if (hasPlus) {
+        variations.push(phoneNumber.trim());
+        return variations;
     }
 
-    // Without country code
-    if (cleaned.startsWith('91') && cleaned.length >= 10) {
-        variations.add(cleaned.substring(2)); // 8884180740
-    }
-
-    // Different prefix lengths for Indian numbers
-    if (cleaned.length >= 10) {
-        const last10 = cleaned.slice(-10);
-        variations.add(last10); // 8884180740
-        variations.add('+91' + last10); // +918884180740
-        variations.add('91' + last10); // 918884180740
-        
-        // Shorter variations (sometimes stored without leading digits)
-        if (last10.startsWith('0')) {
-            variations.add(last10.substring(1)); // 884180740 (9 digits)
+    // Determine country code based on length and patterns
+    if (cleaned.length === 10) {
+        // 10 digits - could be Indian or US
+        // For Medicover (Indian hospital), try +91 first
+        variations.push(`+91${cleaned}`);
+        variations.push(`+1${cleaned}`);
+    } else if (cleaned.length === 11) {
+        if (cleaned.startsWith('1')) {
+            // US number with 1 prefix
+            variations.push(`+${cleaned}`);
+        } else {
+            // Try as-is with +
+            variations.push(`+${cleaned}`);
         }
-        
-        // Even shorter (sometimes area codes removed)
-        const last9 = last10.substring(1);
-        variations.add(last9); // 884180740
-        
-        const last8 = last9.substring(1);
-        variations.add(last8); // 84180740
-    }
-
-    // ==================== US/CANADA NUMBER VARIATIONS (+1) ====================
-    
-    // Full format with +1
-    if (cleaned.length === 11 && cleaned.startsWith('1')) {
-        variations.add('+' + cleaned); // +15551234567
-        variations.add(cleaned.substring(1)); // 5551234567 (remove 1)
-    } else if (cleaned.length === 10 && !cleaned.startsWith('91')) {
-        // 10 digit number - could be US/Canada
-        variations.add('+1' + cleaned); // +15551234567
-        variations.add('1' + cleaned); // 15551234567
-    }
-
-    // Without country code
-    if (cleaned.startsWith('1') && cleaned.length === 11) {
-        variations.add(cleaned.substring(1)); // 5551234567
-    }
-
-    // Different prefix lengths for US/Canada numbers
-    if (cleaned.length >= 10 && !cleaned.startsWith('91')) {
-        const last10 = cleaned.slice(-10);
-        variations.add(last10); // 5551234567
-        variations.add('+1' + last10); // +15551234567
-        variations.add('1' + last10); // 15551234567
-    }
-
-    // ==================== INTERNATIONAL FORMAT VARIATIONS ====================
-    
-    // If original had + prefix, add with and without
-    if (phone.startsWith('+')) {
-        variations.add(phone);
-        variations.add(phone.substring(1));
+    } else if (cleaned.length === 12) {
+        if (cleaned.startsWith('91')) {
+            // Indian number with 91 prefix
+            variations.push(`+${cleaned}`);
+        } else {
+            // Try as-is with +
+            variations.push(`+${cleaned}`);
+        }
     } else {
-        variations.add('+' + cleaned);
+        // Other lengths - try with + prefix
+        variations.push(`+${cleaned}`);
     }
 
-    // Return as sorted array (shortest to longest for efficient searching)
-    return Array.from(variations).sort((a, b) => a.length - b.length);
+    return variations;
 }
-
 /**
  * Validate phone number format
  * Supports both Indian and US/Canada numbers
@@ -186,7 +137,7 @@ export function isValidPhoneNumber(phone) {
 
     // Check against all patterns
     const allPatterns = [...indianPatterns, ...usPatterns];
-    
+
     return allPatterns.some(pattern => {
         // Test against original format
         if (pattern.test(phone)) return true;
@@ -243,7 +194,7 @@ export function detectCountry(phone) {
     if (!phone) return 'UNKNOWN';
 
     const normalized = normalizePhoneNumber(phone);
-    
+
     if (normalized.startsWith('+91')) {
         return 'IN'; // India
     } else if (normalized.startsWith('+1')) {

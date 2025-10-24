@@ -915,7 +915,6 @@ export const inboundCall = async (req, res) => {
         console.log(`Inbound call from ${callerId} to ${to}`);
 
         // ==================== STEP 1: CHECK FHIR/EMR ONLY ====================
-        console.log('Checking FHIR/EMR for patient (EMR as single source of truth)...');
         const fhirResult = await fhirSearchService.findOrImportPatientByPhone(callerId);
 
         let patient;

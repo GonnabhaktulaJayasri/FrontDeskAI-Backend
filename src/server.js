@@ -24,7 +24,7 @@ server.listen(PORT, () => {
     //     followUpService.start();
     // } 
 
-    messageAutomationService.start();
+    // messageAutomationService.start();
 
 });
 
@@ -33,20 +33,20 @@ process.on('SIGINT', () => {
     console.log('\nReceived SIGINT, shutting down gracefully...');
     // appointmentReminderService.stop();
     // followUpService.stop();
-    messageAutomationService.stop();
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
+    // messageAutomationService.stop();
+    // server.close(() => {
+    //     console.log('Server closed');
+    //     process.exit(0);
+    // });
 });
 
 process.on('SIGTERM', () => {
     console.log('Received SIGTERM, shutting down gracefully...');
     // appointmentReminderService.stop();
     // followUpService.stop();
-    MessageAutomationService.stop();
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
+    // MessageAutomationService.stop();
+    // server.close(() => {
+    //     console.log('Server closed');
+    //     process.exit(0);
+    // });
 });

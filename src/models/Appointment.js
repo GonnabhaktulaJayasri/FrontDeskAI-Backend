@@ -718,6 +718,342 @@
 
 // export default Appointment;
 
+
+
+{ /*with emr */}
+// import mongoose from "mongoose";
+// import fhirService from "../services/fhirService.js";
+
+// const appointmentSchema = new mongoose.Schema({
+//   patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true },
+//   doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor', required: true },
+//   hospital: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital' },
+//   dateTime: { type: Date, required: true },
+//   status: {
+//     type: String,
+//     enum: ['initiated', 'scheduled', 'confirmed', 'rescheduled', 'cancelled', 'completed', 'no_show'],
+//     default: 'initiated'
+//   },
+//   reason: String,
+//   completedAt: Date,
+
+//   // FHIR Integration fields
+//   fhirId: {
+//     type: String,
+//     index: true,
+//     sparse: true
+//   },
+//   fhirLastSync: {
+//     type: Date
+//   },
+//   fhirSyncStatus: {
+//     type: String,
+//     enum: ['pending', 'synced', 'error'],
+//     default: 'pending'
+//   },
+//   fhirSyncError: String,
+
+//   // Existing reminder and follow-up fields
+//   reminders: {
+//     "24_hour": {
+//       enabled: { type: Boolean, default: true },
+//       method: { type: String, enum: ['auto', 'call', 'sms', 'whatsapp'], default: 'auto' },
+//       status: { type: String, enum: ['not_sent', 'sent', 'delivered', 'read', 'answered', 'no_answer', 'failed'], default: 'not_sent' },
+//       sentAt: Date,
+//       callSid: { type: String }, // For calls
+//       messageSid: { type: String }, // For messages
+//       conversationId: {
+//         type: mongoose.Schema.Types.ObjectId,
+//         ref: 'Message'
+//       }, // Link to message conversation
+//       lastAttempt: { type: Date },
+//       attemptCount: { type: Number, default: 0 },
+//       maxAttempts: { type: Number, default: 3 }
+//     },
+//     "1_hour": {
+//       enabled: { type: Boolean, default: true },
+//       method: { type: String, enum: ['auto', 'call', 'sms', 'whatsapp'], default: 'auto' },
+//       status: { type: String, enum: ['not_sent', 'sent', 'delivered', 'read', 'answered', 'no_answer', 'failed'], default: 'not_sent' },
+//       sentAt: Date,
+//       callSid: { type: String }, // For calls
+//       messageSid: { type: String }, // For messages
+//       conversationId: {
+//         type: mongoose.Schema.Types.ObjectId,
+//         ref: 'Message'
+//       }, // Link to message conversation
+//       lastAttempt: { type: Date },
+//       attemptCount: { type: Number, default: 0 },
+//       maxAttempts: { type: Number, default: 3 }
+//     }
+//   },
+
+//   reminderPreferences: {
+//     enabled: { type: Boolean, default: true },
+//     // Primary method preference
+//     preferredMethod: {
+//       type: String,
+//       enum: ['call', 'sms', 'whatsapp', 'both_messages', 'auto'],
+//       default: 'auto' // Uses patient's global communication preference
+//     },
+//     // Fallback method if primary fails
+//     fallbackMethod: {
+//       type: String,
+//       enum: ['call', 'sms', 'whatsapp', 'none'],
+//       default: 'call'
+//     },
+//     timePreferences: {
+//       dayBefore: { type: Boolean, default: true },
+//       hourBefore: { type: Boolean, default: true }
+//     },
+//     // Message-specific preferences
+//     messagePreferences: {
+//       language: { type: String, default: 'en' },
+//       includeLocation: { type: Boolean, default: true },
+//       includeDoctorName: { type: Boolean, default: true }
+//     }
+//   },
+
+//   followUp: {
+//     enabled: { type: Boolean, default: true },
+//     method: { type: String, enum: ['auto', 'call', 'sms'], default: 'auto' },
+//     status: {
+//       type: String, enum: [
+//         'not_scheduled',  // Default state
+//         'scheduled',      // Scheduled but not sent yet
+//         'in_progress',    // Currently being processed
+//         'sent',          // Call initiated or message sent
+//         'sent_message',  // Specifically for messages
+//         'delivered',     // Message delivered
+//         'read',          // Message read
+//         'answered',      // Call was answered or message replied to
+//         'no_answer',     // No answer received (call) or no reply (message)
+//         'busy',          // Line was busy (call only)
+//         'failed',        // Communication failed
+//         'completed',     // Follow-up completed successfully
+//         'escalated',     // Escalated from message to call
+//         'canceled'       // Manually canceled
+//       ],
+//       default: 'not_scheduled'
+//     },
+//     scheduledDate: Date,
+//     scheduledAt: Date,
+//     attemptCount: { type: Number, default: 0 },
+//     maxAttempts: { type: Number, default: 3 },
+//     lastAttempt: { type: Date },
+//     // Communication tracking
+//     callSid: { type: String },
+//     messageSid: { type: String },
+//     conversationId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: 'Message'
+//     },
+//     callRecordId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: 'Call'
+//     },
+
+//     // Escalation tracking
+//     escalatedAt: { type: Date },
+//     escalationReason: {
+//       type: String,
+//       enum: ['no_response', 'patient_request', 'complex_issue', 'manual']
+//     },
+
+//     lastStatusUpdate: { type: Date },
+//     errorMessage: { type: String },
+//     notes: { type: String },
+//     toggledAt: { type: Date },
+
+//     // Follow-up results
+//     outcome: {
+//       type: String,
+//       enum: ['satisfied', 'needs_attention', 'complaint', 'referral', 'no_response']
+//     },
+//     patientFeedback: { type: String },
+//     actionRequired: { type: Boolean, default: false },
+//     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+//   },
+
+//   communicationSummary: {
+//     totalReminders: { type: Number, default: 0 },
+//     totalFollowUps: { type: Number, default: 0 },
+//     callsAttempted: { type: Number, default: 0 },
+//     messagesAttempted: { type: Number, default: 0 },
+//     successfulContacts: { type: Number, default: 0 },
+//     lastContactMethod: {
+//       type: String,
+//       enum: ['call', 'sms', 'whatsapp']
+//     },
+//     lastContactAt: { type: Date },
+//     patientResponsiveness: {
+//       type: String,
+//       enum: ['high', 'medium', 'low', 'unknown'],
+//       default: 'unknown'
+//     }
+//   }
+// }, {
+//   timestamps: true
+// });
+
+// // Indexes
+// appointmentSchema.index({ patient: 1, dateTime: -1 });
+// appointmentSchema.index({ doctor: 1, dateTime: 1 });
+// appointmentSchema.index({ dateTime: 1 });
+// appointmentSchema.index({ status: 1 });
+// // appointmentSchema.index({ fhirId: 1 });
+// appointmentSchema.index({ fhirSyncStatus: 1 });
+
+// // MIDDLEWARE: After saving appointment, sync to FHIR server
+// appointmentSchema.post('save', async function (doc, next) {
+//   try {
+//     if (doc._skipFhirSync) {
+//       return next();
+//     }
+
+//     // Need to populate patient and doctor for FHIR sync
+//     await doc.populate(['patient', 'doctor']);
+
+//     // Ensure patient and doctor have FHIR IDs
+//     if (!doc.patient?.fhirId || !doc.doctor?.fhirId) {
+//       console.warn('Cannot sync appointment to FHIR: Patient or Doctor missing FHIR ID');
+//       return next();
+//     }
+
+//     let result;
+//     if (doc.fhirId) {
+//       result = await fhirService.updateAppointment(
+//         doc.fhirId,
+//         doc,
+//         doc.patient.fhirId,
+//         doc.doctor.fhirId
+//       );
+//     } else {
+//       result = await fhirService.createAppointment(
+//         doc,
+//         doc.patient.fhirId,
+//         doc.doctor.fhirId
+//       );
+//     }
+
+//     if (result.success) {
+//       await mongoose.model('Appointment').updateOne(
+//         { _id: doc._id },
+//         {
+//           $set: {
+//             fhirId: result.fhirId || doc.fhirId,
+//             fhirLastSync: new Date(),
+//             fhirSyncStatus: 'synced',
+//             fhirSyncError: null
+//           }
+//         }
+//       );
+//     } else {
+//       await mongoose.model('Appointment').updateOne(
+//         { _id: doc._id },
+//         {
+//           $set: {
+//             fhirSyncStatus: 'error',
+//             fhirSyncError: JSON.stringify(result.error)
+//           }
+//         }
+//       );
+//       console.error('FHIR sync error for appointment:', doc._id, result.error);
+//     }
+
+//     next();
+//   } catch (error) {
+//     console.error('Error in FHIR sync middleware:', error);
+//     next();
+//   }
+// });
+
+// // INSTANCE METHODS
+
+// appointmentSchema.methods.markCompleted = function () {
+//   this.status = 'completed';
+//   this.completedAt = new Date();
+//   return this.save();
+// };
+
+// appointmentSchema.methods.syncToFHIR = async function () {
+//   try {
+//     await this.populate(['patient', 'doctor']);
+
+//     if (!this.patient?.fhirId || !this.doctor?.fhirId) {
+//       return {
+//         success: false,
+//         error: 'Patient or Doctor missing FHIR ID. Sync them first.'
+//       };
+//     }
+
+//     let result;
+//     if (this.fhirId) {
+//       result = await fhirService.updateAppointment(
+//         this.fhirId,
+//         this,
+//         this.patient.fhirId,
+//         this.doctor.fhirId
+//       );
+//     } else {
+//       result = await fhirService.createAppointment(
+//         this,
+//         this.patient.fhirId,
+//         this.doctor.fhirId
+//       );
+//     }
+
+//     if (result.success) {
+//       this._skipFhirSync = true;
+//       this.fhirId = result.fhirId || this.fhirId;
+//       this.fhirLastSync = new Date();
+//       this.fhirSyncStatus = 'synced';
+//       this.fhirSyncError = null;
+//       await this.save();
+//       delete this._skipFhirSync;
+//     } else {
+//       this._skipFhirSync = true;
+//       this.fhirSyncStatus = 'error';
+//       this.fhirSyncError = JSON.stringify(result.error);
+//       await this.save();
+//       delete this._skipFhirSync;
+//     }
+
+//     return result;
+//   } catch (error) {
+//     console.error('Error syncing appointment to FHIR:', error);
+//     return { success: false, error: error.message };
+//   }
+// };
+
+// appointmentSchema.methods.fetchFromFHIR = async function () {
+//   if (!this.fhirId) {
+//     return { success: false, error: 'No FHIR ID available' };
+//   }
+
+//   try {
+//     return await fhirService.getAppointment(this.fhirId);
+//   } catch (error) {
+//     console.error('Error fetching appointment from FHIR:', error);
+//     return { success: false, error: error.message };
+//   }
+// };
+
+// // STATIC METHODS
+
+// appointmentSchema.statics.searchInFHIR = async function (searchParams) {
+//   try {
+//     return await fhirService.searchAppointments(searchParams);
+//   } catch (error) {
+//     console.error('Error searching appointments in FHIR:', error);
+//     return { success: false, error: error.message };
+//   }
+// };
+
+// export default mongoose.model("Appointment", appointmentSchema);
+
+
+{/*for family */}
+
 import mongoose from "mongoose";
 import fhirService from "../services/fhirService.js";
 
@@ -887,6 +1223,43 @@ const appointmentSchema = new mongoose.Schema({
       enum: ['high', 'medium', 'low', 'unknown'],
       default: 'unknown'
     }
+  },
+
+  // ENHANCED BOOKING FIELDS - Support for self, family, and care center bookings
+  bookingType: {
+    type: String,
+    enum: ['self', 'family', 'care_center', 'direct'],
+    default: 'direct',
+    index: true
+  },
+  
+  // Track who made the booking (useful for family and care center bookings)
+  bookedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Patient",
+    index: true
+  },
+  
+  // Family booking specific fields
+  familyRelationship: {
+    type: String,
+    enum: ['spouse', 'parent', 'child', 'sibling', 'grandparent', 'grandchild', 'other']
+  },
+  
+  // Care center booking specific fields
+  careCenterInfo: {
+    careCenterName: String,
+    patientId: String,
+    medicalRecordNumber: String,
+    contactPerson: String,
+    contactPhone: String
+  },
+  
+  confirmationNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true
   }
 }, {
   timestamps: true
@@ -1044,6 +1417,59 @@ appointmentSchema.statics.searchInFHIR = async function (searchParams) {
     console.error('Error searching appointments in FHIR:', error);
     return { success: false, error: error.message };
   }
+};
+
+// ENHANCED BOOKING METHODS
+
+// Pre-save hook to generate confirmation number if not exists
+appointmentSchema.pre('save', function (next) {
+  if (!this.confirmationNumber && this.isNew) {
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    this.confirmationNumber = `APT-${timestamp}-${random}`;
+  }
+  next();
+});
+
+// Instance method to get booking context (who booked for whom)
+appointmentSchema.methods.getBookingContext = async function () {
+  await this.populate('patient bookedBy');
+  
+  const context = {
+    bookingType: this.bookingType,
+    patient: {
+      name: `${this.patient.firstName} ${this.patient.lastName}`,
+      phone: this.patient.phone
+    }
+  };
+  
+  if (this.bookingType === 'self') {
+    context.message = `Booked by patient themselves`;
+  } else if (this.bookingType === 'family' && this.bookedBy) {
+    context.bookedBy = {
+      name: `${this.bookedBy.firstName} ${this.bookedBy.lastName}`,
+      phone: this.bookedBy.phone,
+      relationship: this.familyRelationship
+    };
+    context.message = `Booked by ${context.bookedBy.name} (${this.familyRelationship})`;
+  } else if (this.bookingType === 'care_center') {
+    context.careCenterInfo = this.careCenterInfo;
+    context.message = `Booked for care center patient from ${this.careCenterInfo?.careCenterName || 'care facility'}`;
+  }
+  
+  return context;
+};
+
+// Static method to find appointments by booking type
+appointmentSchema.statics.findByBookingType = function (bookingType, filters = {}) {
+  return this.find({
+    bookingType,
+    ...filters
+  })
+    .populate('patient', 'firstName lastName phone')
+    .populate('doctor', 'name specialty')
+    .populate('bookedBy', 'firstName lastName phone')
+    .sort({ dateTime: 1 });
 };
 
 export default mongoose.model("Appointment", appointmentSchema);
